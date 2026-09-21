@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #f3f3f3;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+.ui-yellow {
+  background-color: #f5c400;
+}
+
+.ui-yellow-hover:hover {
+  background-color: #e0b100;
+}
+
+.ui-yellow-text {
+  color: #f5c400;
+}
+
+.ui-yellow-text:hover {
+  color: #e0b100;
+}
+
+.ui-yellow-border:focus {
+  border-color: #f5c400;
+  box-shadow: 0 0 0 3px rgba(245, 196, 0, 0.35);
+}
+
+.ui-yellow-accent {
+  accent-color: #f5c400;
+}
+
+/* Customer-page motion: page-content fade-in on route mount, and an animated
+   nav-link underline. Scoped narrowly so they don't touch vendor dashboard UI. */
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-fade-in {
+  animation: page-fade-in 300ms ease-out both;
+}
+
+.nav-underline {
+  position: relative;
+}
+
+.nav-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 2px;
+  background-color: #f5c400;
+  border-radius: 9999px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 200ms ease;
+}
+
+.nav-underline:hover::after,
+.nav-underline.is-active::after {
+  transform: scaleX(1);
+}
+
+/* Login modal overlay: card pops in while the dimmed/blurred backdrop fades in. */
+@keyframes login-modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.login-modal-pop {
+  animation: login-modal-pop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes login-overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.login-overlay-fade {
+  animation: login-overlay-fade 200ms ease-out both;
+}
+
+/* Keeps a scrollable area's scroll behavior while hiding the visible
+   scrollbar track/thumb — used by the auth modal so a tall form (e.g.
+   Vendor Registration) scrolls cleanly without a scrollbar bisecting the
+   rounded card. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Payment success icon: gentle scale+fade pop once the check appears. */
+@keyframes success-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.success-pop {
+  animation: success-pop 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-fade-in {
+    animation: none;
+  }
+
+  .nav-underline::after {
+    transition: none;
+  }
+
+  .success-pop {
+    animation: none;
+  }
+}
