@@ -125,8 +125,6 @@ function formatMoney(value) {
   return `$${(Number(value) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 }
 
-const PLATFORM_COMMISSION_RATE = 0.1;
-
 function emptyItem() {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -231,8 +229,6 @@ export default function CreateQuotationPage() {
   const additionalTotal =
     (Number(transportationFee) || 0) + (Number(equipmentFee) || 0) + (Number(otherCharges) || 0);
   const grandTotal = subtotal + additionalTotal;
-  const platformFee = grandTotal * PLATFORM_COMMISSION_RATE;
-  const vendorReceives = grandTotal - platformFee;
 
   async function handleSend() {
     setSubmitError('');
@@ -597,13 +593,6 @@ export default function CreateQuotationPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-black/40">Total Quotation</p>
                 <p className="mt-0.5 text-2xl font-extrabold text-green-600">{formatMoney(grandTotal)}</p>
               </div>
-            </div>
-
-            <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-dashed border-gray-200 px-4 py-2.5 text-xs text-black/45">
-              <span>Platform Fee ({Math.round(PLATFORM_COMMISSION_RATE * 100)}%, visible to you only)</span>
-              <span className="font-semibold text-black/60">
-                -{formatMoney(platformFee)} &middot; You'll receive {formatMoney(vendorReceives)}
-              </span>
             </div>
 
             <div className="mt-6 border-t border-gray-100 pt-5">
