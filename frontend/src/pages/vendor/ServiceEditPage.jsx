@@ -72,7 +72,6 @@ export default function ServiceEditPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   function update(field, value) {
@@ -179,14 +178,14 @@ export default function ServiceEditPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <h1 className="mb-6 text-2xl font-bold text-black">Edit Service</h1>
 
       {loading ? <p className="mb-4 text-sm text-black/60">Loading service details…</p> : null}
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8"
+        className="space-y-6 rounded-2xl border border-gray-100 bg-white p-7 shadow-sm sm:p-10"
       >
         <ServiceFormFields form={form} update={update} />
 

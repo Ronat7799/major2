@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../../api/client';
+import { BlurOverlay, LoadingOverlay } from '../../components/StatusOverlay.jsx';
 
 function CheckIcon() {
   return (
@@ -65,65 +66,54 @@ export default function PaymentSuccessPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  if (phase === 'processing') {
+    return <LoadingOverlay title="Processing your payment..." message="Please wait while we confirm your booking." />;
+  }
+
   return (
-    <div className="page-fade-in flex min-h-[70vh] items-center justify-center px-6 py-16">
-      <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm">
-        {phase === 'processing' ? (
-          <>
-            <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
-              <span className="absolute inset-0 rounded-full bg-[#F5C400]/15 animate-ping" />
-              <span className="h-14 w-14 rounded-full border-4 border-black/10 border-t-[#F5C400] animate-spin" />
-            </div>
-            <h1 className="mt-6 text-xl font-extrabold text-black">Processing your payment...</h1>
-            <p className="mt-2 text-sm text-black/45">Please wait while we confirm your booking.</p>
-          </>
-        ) : (
-          <>
-            <div className="success-pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
-              <CheckIcon />
-            </div>
-            <h1 className="mt-6 text-xl font-extrabold text-black">Payment Successful</h1>
-            <p className="mt-2 text-sm text-black/45">
-              {stage === 'deposit'
-                ? 'Your deposit has been received — the remaining balance is due before your event.'
-                : 'Your booking is fully paid.'}
-            </p>
-
-            {quotation ? (
-              <div className="mt-6 divide-y divide-gray-100 rounded-xl bg-gray-50 px-4 text-left">
-                <DetailRow label="Booking ID" value={quotation.quotationCode} />
-                <DetailRow label="Event" value={quotation.event.eventType || 'Not specified'} />
-                <DetailRow label="Vendor" value={quotation.vendor.name} />
-                {stage === 'deposit' && booking?.payment ? (
-                  <>
-                    <DetailRow label="Deposit Paid" value={formatMoney(booking.payment.deposit.amount)} highlighted />
-                    <DetailRow label="Balance Due" value={formatMoney(booking.payment.balance.amount)} />
-                  </>
-                ) : (
-                  <DetailRow label="Total Amount" value={formatMoney(quotation.grandTotal)} highlighted />
-                )}
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() =>
-                navigate(quotation.bookingId ? `/customer/bookings/${quotation.bookingId}` : `/customer/quotations/${id}`)
-              }
-              className="ui-yellow ui-yellow-hover mt-6 w-full rounded-full py-3.5 text-sm font-bold text-black shadow-sm transition-all hover:scale-[1.01] active:scale-100"
-            >
-              View Booking Details
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="mt-3 w-full rounded-full border border-gray-200 py-3.5 text-sm font-semibold text-black transition-colors hover:border-gray-300 hover:bg-gray-50"
-            >
-              Back to Home
-            </button>
-          </>
-        )}
+    <BlurOverlay>
+      <div className="success-pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+        <CheckIcon />
       </div>
-    </div>
+      <h1 className="mt-6 text-xl font-extrabold text-black">Payment Successful</h1>
+      <p className="mt-2 text-sm text-black/45">
+        {stage === 'deposit'
+          ? 'Your deposit has been received — the remaining balance is due before your event.'
+          : 'Your booking is fully paid.'}
+      </p>
+
+      {quotation ? (
+        <div className="mt-6 divide-y divide-gray-100 rounded-xl bg-gray-50 px-4 text-left">
+          <DetailRow label="Booking ID" value={quotation.quotationCode} />
+          <DetailRow label="Event" value={quotation.event.eventType || 'Not specified'} />
+          <DetailRow label="Vendor" value={quotation.vendor.name} />
+          {stage === 'deposit' && booking?.payment ? (
+            <>
+              <DetailRow label="Deposit Paid" value={formatMoney(booking.payment.deposit.amount)} highlighted />
+              <DetailRow label="Balance Due" value={formatMoney(booking.payment.balance.amount)} />
+            </>
+          ) : (
+            <DetailRow label="Total Amount" value={formatMoney(quotation.grandTotal)} highlighted />
+          )}
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() =>
+          navigate(quotation.bookingId ? `/customer/bookings/${quotation.bookingId}` : `/customer/quotations/${id}`)
+        }
+        className="ui-yellow ui-yellow-hover mt-6 w-full rounded-full py-3.5 text-sm font-bold text-black shadow-sm transition-all hover:scale-[1.01] active:scale-100"
+      >
+        View Booking Details
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        className="mt-3 w-full rounded-full border border-gray-200 py-3.5 text-sm font-semibold text-black transition-colors hover:border-gray-300 hover:bg-gray-50"
+      >
+        Back to Home
+      </button>
+    </BlurOverlay>
   );
 }

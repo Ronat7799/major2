@@ -35,10 +35,6 @@ async function findByBookingId(booking_id) {
   return data;
 }
 
-// A vendor's chat invite for a quotation still awaiting a revision — no
-// booking exists yet, so this is scoped to quotation_id instead. Re-inviting
-// after a decline flips the existing row back to 'invited' rather than
-// creating a second one (quotation_id is unique).
 async function createInvite({ quotation_id, vendor_id, user_id }) {
   const { data, error } = await supabase
     .from('conversations')

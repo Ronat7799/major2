@@ -245,8 +245,6 @@ function mapMessage(message) {
   };
 }
 
-// Which side's presence/typing this page should react to — the vendor page
-// cares about the customer's socket, the customer page cares about the vendor's.
 const COUNTERPART_SIDE = 'customer';
 
 export default function VendorMessagesPage() {
@@ -270,8 +268,6 @@ export default function VendorMessagesPage() {
     conversationsRef.current = conversations;
   }, [conversations]);
 
-  // Initial load: full conversation list with event/booking details (the
-  // socket only carries live deltas going forward, not history).
   useEffect(() => {
     let cancelled = false;
 
@@ -301,9 +297,6 @@ export default function VendorMessagesPage() {
     };
   }, []);
 
-  // Joins every conversation's socket room so previews and presence update
-  // live across the whole list, not just the open conversation. Re-joins on
-  // reconnect since Socket.IO room membership doesn't survive a disconnect.
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
@@ -332,7 +325,6 @@ export default function VendorMessagesPage() {
     return () => socket.off('connect', handleReconnect);
   }, [conversations]);
 
-  // Live message + presence + typing events for every joined conversation.
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
@@ -380,7 +372,6 @@ export default function VendorMessagesPage() {
     };
   }, []);
 
-  // Loads message history for the opened conversation and marks it read.
   useEffect(() => {
     if (!selectedId) return;
     let cancelled = false;
@@ -412,7 +403,6 @@ export default function VendorMessagesPage() {
 
   const active = conversations.find((conversation) => conversation.id === selectedId);
 
-  // Keeps the chat scrolled to the newest message as new ones arrive.
   useEffect(() => {
     if (!active) return;
     messagesEndRef.current?.scrollIntoView({ block: 'end' });
@@ -430,8 +420,6 @@ export default function VendorMessagesPage() {
       if (!response?.success) {
         setError(response?.message || 'Unable to send message.');
       }
-      // On success the server also broadcasts this via `receive_message`,
-      // which is what actually appends it to the chat.
     });
   }
 
@@ -455,7 +443,6 @@ export default function VendorMessagesPage() {
   const isCounterpartOnline = active ? onlineMap[active.id] ?? active.online : false;
   const isCounterpartTyping = active ? Boolean(typingMap[active.id]) : false;
 
-  // List view: just the conversation list, full width.
   if (!active) {
     return (
       <div className="-mx-10 -my-8">
@@ -517,10 +504,8 @@ export default function VendorMessagesPage() {
     );
   }
 
-  // Detail view: back button, chat window, and booking info side panel.
   return (
     <div className="-mx-10 -my-8 flex h-[calc(100vh-4rem)]">
-      {/* Chat column (header lives here, same as the customer chat page) */}
       <div className="flex flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-gray-100 px-10 py-4">
           <div className="flex items-center gap-3">
@@ -631,7 +616,6 @@ export default function VendorMessagesPage() {
           )}
         </div>
 
-        {/* Booking info panel */}
         <div className="w-72 shrink-0 overflow-y-auto border-l border-gray-100 px-6 py-6">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -673,5 +657,4 @@ export default function VendorMessagesPage() {
     </div>
   );
 }
-
 

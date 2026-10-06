@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import api from '../../api/client';
 import { getErrorMessage } from '../../utils/apiError.js';
 import ImageLightbox from '../../components/ImageLightbox.jsx';
+import RevisionRequestNotice from '../../components/vendor/RevisionRequestNotice.jsx';
 
 function BackIcon() {
   return (
@@ -144,8 +145,6 @@ function formatLongDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-// event_date is a plain "YYYY-MM-DD" string; build the Date from parts so a
-// negative-UTC timezone doesn't roll it back to the previous day.
 function formatEventDate(dateString) {
   if (!dateString) {
     return 'Not specified';
@@ -305,16 +304,12 @@ export default function QuotationRequestDetailPage() {
   }
 
   const isAccepted = request.status === 'ACCEPTED';
-  // "Other" carries no information as a chip — its detail already lives in the
-  // Event Description (see buildFinalDescription on the customer form). Filtered
-  // here too so requests submitted before that change don't show a bare "Other".
   const displayedServices = request.services.filter(
     (service) => service.trim().toLowerCase() !== 'other' && !service.trim().toLowerCase().startsWith('other:')
   );
 
   return (
     <div className="pb-4">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-black/45">
         <button
           type="button"
@@ -344,15 +339,9 @@ export default function QuotationRequestDetailPage() {
       ) : null}
 
       {request.latestQuotation?.status === 'revision_requested' ? (
-        <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5">
-          <p className="text-sm font-semibold text-blue-700">The customer asked for changes to your quotation.</p>
-          {request.latestQuotation.revisionNote ? (
-            <p className="mt-1 text-sm text-blue-700/80">“{request.latestQuotation.revisionNote}”</p>
-          ) : null}
-        </div>
+        <RevisionRequestNotice className="mt-4" note={request.latestQuotation.revisionNote} />
       ) : null}
 
-      {/* Header */}
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-extrabold text-black sm:text-[28px]">
@@ -409,7 +398,6 @@ export default function QuotationRequestDetailPage() {
         </div>
       </div>
 
-      {/* Customer Information */}
       <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="ui-yellow-text text-base font-bold">Customer Information</h2>
         <div className="mt-4 border-t border-gray-100 pt-4">
@@ -445,7 +433,6 @@ export default function QuotationRequestDetailPage() {
         </div>
       </div>
 
-      {/* Event Summary */}
       <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="ui-yellow-text text-base font-bold">Event Summary</h2>
 
@@ -482,6 +469,20 @@ export default function QuotationRequestDetailPage() {
           </div>
         </div>
 
+        {request.requestedService ? (
+          <div className="mt-6 border-t border-gray-100 pt-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-black/40">Requested Service</p>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="rounded-full ui-yellow px-3.5 py-1.5 text-sm font-semibold text-black">
+                {request.requestedService.serviceName}
+              </span>
+              {request.requestedService.category ? (
+                <span className="text-xs text-black/45">{request.requestedService.category}</span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-6 border-t border-gray-100 pt-5">
           <p className="text-xs font-bold uppercase tracking-wide text-black/40">Required Services</p>
           {displayedServices.length > 0 ? (
@@ -501,7 +502,6 @@ export default function QuotationRequestDetailPage() {
         </div>
       </div>
 
-      {/* Inspiration Images */}
       <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="ui-yellow-text text-base font-bold">Inspiration Images</h2>
         <p className="mt-0.5 text-xs text-black/45">Uploaded by customer</p>
@@ -538,7 +538,6 @@ export default function QuotationRequestDetailPage() {
         />
       </div>
 
-      {/* Request Information */}
       <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="ui-yellow-text text-base font-bold">Request Information</h2>
         <div className="mt-4 grid grid-cols-1 gap-5 border-t border-gray-100 pt-5 sm:grid-cols-3">

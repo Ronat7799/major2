@@ -4,7 +4,7 @@ import CustomerFooter from '../components/customer/CustomerFooter.jsx';
 
 export default function CustomerLayout() {
   const location = useLocation();
-  const hideFooter = location.pathname === '/vendors';
+  const hideFooter = location.pathname === '/vendors' || location.pathname === '/customer/messages';
 
   return (
     <div className="flex min-h-screen flex-col bg-white">

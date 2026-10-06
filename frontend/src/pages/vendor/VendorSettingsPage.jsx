@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
+import ToggleSwitch from '../../components/ToggleSwitch.jsx';
 import { getErrorMessage } from '../../utils/apiError.js';
 
-// UI-only for now — no backend field exists for any of these yet, toggling
-// just flips local state.
 const ACCOUNT_SETTINGS_ROWS = [
   {
     key: 'email_notifications',
@@ -31,27 +30,6 @@ const ACCOUNT_SETTINGS_ROWS = [
     defaultChecked: false,
   },
 ];
-
-function ToggleSwitch({ checked, onChange, label }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ${
-        checked ? 'ui-yellow' : 'bg-gray-200'
-      }`}
-    >
-      <span
-        className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-          checked ? 'translate-x-5' : 'translate-x-0'
-        }`}
-      />
-    </button>
-  );
-}
 
 export default function VendorSettingsPage() {
   const navigate = useNavigate();
@@ -108,7 +86,7 @@ export default function VendorSettingsPage() {
     <div>
       <div>
         <h1 className="ui-yellow-text text-[28px] font-extrabold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-black/50">Manage your Reab Jom vendor account settings and preferences.</p>
+        <p className="mt-1 text-sm text-black/50">Manage your ReabJom vendor account settings and preferences.</p>
       </div>
 
       <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">

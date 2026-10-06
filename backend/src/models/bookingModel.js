@@ -1,12 +1,27 @@
 const supabase = require('../config/supabase');
 const AppError = require('../utils/AppError');
 
+function isMissingColumnError(error) {
+  return error?.code === '42703' || error?.code === 'PGRST204';
+}
+
 async function createBooking(fields) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('bookings')
     .insert(fields)
-    .select('id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, created_at, updated_at')
+    .select(
+      'id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, deposit_due_at, created_at, updated_at'
+    )
     .single();
+
+  if (error && isMissingColumnError(error)) {
+    const { deposit_due_at, ...baseFields } = fields;
+    ({ data, error } = await supabase
+      .from('bookings')
+      .insert(baseFields)
+      .select('id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, created_at, updated_at')
+      .single());
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to create booking.');
@@ -15,15 +30,20 @@ async function createBooking(fields) {
   return data;
 }
 
-// Unscoped lookup — the caller is responsible for any ownership check;
-// used by paymentService, which only needs the booking's quotation_id and
-// has no notion of "for this customer/vendor" itself.
 async function findById(id) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('bookings')
-    .select('id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, created_at, updated_at')
+    .select('id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, deposit_due_at, created_at, updated_at')
     .eq('id', id)
     .maybeSingle();
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('bookings')
+      .select('id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, created_at, updated_at')
+      .eq('id', id)
+      .maybeSingle());
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to load booking.');
@@ -61,13 +81,23 @@ async function countCompletedByVendorId(vendor_id) {
 }
 
 async function listByUserId(user_id) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('bookings')
     .select(
-      'id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, created_at, updated_at, vendors(company_name, profile_image, business_category)'
+      'id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, deposit_due_at, created_at, updated_at, vendors(company_name, profile_image, business_category)'
     )
     .eq('user_id', user_id)
     .order('created_at', { ascending: false });
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('bookings')
+      .select(
+        'id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, created_at, updated_at, vendors(company_name, profile_image, business_category)'
+      )
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false }));
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to list bookings.');
@@ -77,14 +107,25 @@ async function listByUserId(user_id) {
 }
 
 async function findByIdForUser(id, user_id) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('bookings')
     .select(
-      'id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, created_at, updated_at, vendors(company_name, profile_image, business_category, business_address, created_at)'
+      'id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, deposit_due_at, cancellation_reason, created_at, updated_at, vendors(company_name, profile_image, business_category, business_address, created_at)'
     )
     .eq('id', id)
     .eq('user_id', user_id)
     .maybeSingle();
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('bookings')
+      .select(
+        'id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, created_at, updated_at, vendors(company_name, profile_image, business_category, business_address, created_at)'
+      )
+      .eq('id', id)
+      .eq('user_id', user_id)
+      .maybeSingle());
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to load booking.');
@@ -126,8 +167,6 @@ async function findByIdForVendor(id, vendor_id) {
   return data;
 }
 
-// Scoped to vendor_id so a vendor can only ever update their own booking —
-// returns null (not an error) if the id doesn't exist or isn't theirs.
 async function updateStatusForVendor(id, vendor_id, status) {
   const { data, error } = await supabase
     .from('bookings')
@@ -144,7 +183,6 @@ async function updateStatusForVendor(id, vendor_id, status) {
   return data;
 }
 
-// Scoped to vendor_id, same as updateStatusForVendor, but also records why.
 async function cancelBookingForVendor(id, vendor_id, reason) {
   const { data, error } = await supabase
     .from('bookings')
@@ -161,9 +199,6 @@ async function cancelBookingForVendor(id, vendor_id, reason) {
   return data;
 }
 
-// Deliberately minimal columns (no customer name/contact) — this backs a
-// public availability check (which dates a vendor is already booked), so it
-// must never leak who the other customer is, just that the slot is taken.
 async function findConfirmedScheduleByVendorId(vendor_id) {
   const { data, error } = await supabase
     .from('bookings')
@@ -173,6 +208,42 @@ async function findConfirmedScheduleByVendorId(vendor_id) {
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to load vendor schedule.');
+  }
+
+  return data;
+}
+
+async function findOverdueDepositBookings() {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('id, quotation_id')
+    .eq('status', 'confirmed')
+    .not('deposit_due_at', 'is', null)
+    .lte('deposit_due_at', new Date().toISOString());
+
+  if (error) {
+    if (isMissingColumnError(error)) {
+      return [];
+    }
+    throw new AppError(500, error.message || 'Unable to check overdue deposits.');
+  }
+
+  return data || [];
+}
+
+async function declineBookingForDepositTimeout(id) {
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'declined',
+      cancellation_reason: 'The deposit was not paid within 24 hours, so this booking was automatically declined.',
+    })
+    .eq('id', id)
+    .select('id, quotation_id, vendor_id, user_id, booking_date, start_time, end_time, status, cancellation_reason, created_at, updated_at')
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError(500, error.message || 'Unable to decline booking.');
   }
 
   return data;
@@ -190,4 +261,6 @@ module.exports = {
   updateStatusForVendor,
   cancelBookingForVendor,
   findConfirmedScheduleByVendorId,
+  findOverdueDepositBookings,
+  declineBookingForDepositTimeout,
 };

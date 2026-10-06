@@ -11,16 +11,13 @@ const STATUS_LABELS = {
   confirmed: 'Confirmed',
   completed: 'Completed',
   cancelled: 'Cancelled',
+  declined: 'Declined',
 };
 
 function formatBookingCode(id) {
   return `BK-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 }
 
-// Overlays the DB's own confirmed/completed/cancelled status with
-// 'Pending Payment' whenever a confirmed booking's deposit or balance is
-// still outstanding — completed/cancelled bookings are shown as-is since
-// payment state stops mattering for the label once a booking is final.
 function bookingStatusLabel(dbStatus, paymentSummary) {
   const base = STATUS_LABELS[dbStatus] || 'Confirmed';
   if (base === 'Confirmed' && !paymentSummary.fullyPaid) {
@@ -29,11 +26,6 @@ function bookingStatusLabel(dbStatus, paymentSummary) {
   return base;
 }
 
-// Vendor-only payment-status badge vocabulary, independent of the booking
-// status above. 'Not Available' = no payment row exists at all yet;
-// 'Partially Paid' = deposit paid, balance still outstanding; 'Paid' =
-// fully paid (balance paid, or a legacy fully-paid 'full' row); 'Unpaid' =
-// a stage exists but hasn't succeeded.
 function vendorPaymentStatusLabel(paymentSummary) {
   if (paymentSummary.fullyPaid) return 'Paid';
   if (paymentSummary.deposit.paid) return 'Partially Paid';
@@ -41,8 +33,6 @@ function vendorPaymentStatusLabel(paymentSummary) {
   return 'Not Available';
 }
 
-// Groups a flat list of payment rows (possibly several per booking) into a
-// Map<booking_id, Payment[]> for batch list pages.
 function groupPaymentsByBooking(payments) {
   const map = new Map();
   for (const payment of payments) {
@@ -53,6 +43,30 @@ function groupPaymentsByBooking(payments) {
   return map;
 }
 
+function isDepositPaid(payments) {
+  return payments.some(
+    (payment) =>
+      (payment.payment_type === 'deposit' || payment.payment_type === 'full') && payment.payment_status === 'paid'
+  );
+}
+
+async function expireOverdueDepositBookings() {
+  const candidates = await bookingModel.findOverdueDepositBookings();
+  if (!candidates.length) {
+    return;
+  }
+
+  const payments = await paymentModel.findByBookingIds(candidates.map((booking) => booking.id));
+  const paymentsByBookingId = groupPaymentsByBooking(payments);
+
+  const overdue = candidates.filter((booking) => !isDepositPaid(paymentsByBookingId.get(booking.id) || []));
+  if (!overdue.length) {
+    return;
+  }
+
+  await Promise.all(overdue.map((booking) => bookingModel.declineBookingForDepositTimeout(booking.id)));
+}
+
 async function ratingForVendor(vendorId) {
   const reviews = await reviewModel.findByVendorId(vendorId);
   const total = reviews.length;
@@ -60,9 +74,9 @@ async function ratingForVendor(vendorId) {
   return { average, total };
 }
 
-// A customer's own bookings, newest first — each one backed by the quotation
-// and event details of the request it was created from.
 async function listMyBookings(customerId) {
+  await expireOverdueDepositBookings();
+
   const bookings = await bookingModel.listByUserId(customerId);
   if (!bookings.length) {
     return [];
@@ -87,15 +101,17 @@ async function listMyBookings(customerId) {
     const quotation = quotationById.get(booking.quotation_id);
     const request = quotation ? requestById.get(quotation.quotation_request_id) : null;
     const rating = ratingByVendorId.get(booking.vendor_id) || { average: null, total: 0 };
-    const paymentSummary = paymentService.buildPaymentSummary(
-      quotation ? quotation.grand_total : 0,
-      paymentsByBookingId.get(booking.id) || []
-    );
+    const bookingPayments = paymentsByBookingId.get(booking.id) || [];
+    const paymentSummary = paymentService.buildPaymentSummary(quotation ? quotation.grand_total : 0, bookingPayments);
+    const depositUnpaid = Boolean(booking.deposit_due_at) && !isDepositPaid(bookingPayments);
 
     return {
       id: booking.id,
       bookingCode: formatBookingCode(booking.id),
       status: bookingStatusLabel(booking.status, paymentSummary),
+      depositDueAt: booking.status === 'confirmed' && depositUnpaid ? booking.deposit_due_at : null,
+      depositExpired:
+        booking.status === 'declined' && depositUnpaid && new Date(booking.deposit_due_at).getTime() <= Date.now(),
       vendorId: booking.vendor_id,
       vendorName: booking.vendors?.company_name || 'Vendor',
       vendorLogo: booking.vendors?.profile_image || null,
@@ -110,9 +126,9 @@ async function listMyBookings(customerId) {
   });
 }
 
-// Loads one booking + its quotation/event details, checking it belongs to
-// this customer, for the booking detail page opened after payment.
 async function getBookingDetailForCustomer(customerId, bookingId) {
+  await expireOverdueDepositBookings();
+
   const booking = await bookingModel.findByIdForUser(bookingId, customerId);
   if (!booking) {
     throw new AppError(404, 'Booking not found.');
@@ -142,6 +158,8 @@ async function getBookingDetailForCustomer(customerId, bookingId) {
     bookingDate: booking.booking_date,
     startTime: booking.start_time,
     endTime: booking.end_time,
+    depositDueAt: booking.status === 'confirmed' ? booking.deposit_due_at : null,
+    cancellationReason: booking.cancellation_reason || null,
     createdAt: booking.created_at,
     vendor: {
       id: booking.vendor_id,
@@ -183,9 +201,9 @@ async function getBookingDetailForCustomer(customerId, bookingId) {
   };
 }
 
-// A vendor's own bookings, newest first — same shape used by the customer
-// list above, but the counterpart shown is the customer, not the vendor.
 async function listVendorBookings(vendorId) {
+  await expireOverdueDepositBookings();
+
   const bookings = await bookingModel.listByVendorId(vendorId);
   if (!bookings.length) {
     return [];
@@ -227,9 +245,9 @@ async function listVendorBookings(vendorId) {
   });
 }
 
-// Loads one booking + its quotation/event/customer details, checking it
-// belongs to this vendor, for the vendor's Booking Details page.
 async function getBookingDetailForVendor(vendorId, bookingId) {
+  await expireOverdueDepositBookings();
+
   const booking = await bookingModel.findByIdForVendor(bookingId, vendorId);
   if (!booking) {
     throw new AppError(404, 'Booking not found.');
@@ -285,8 +303,6 @@ async function getBookingDetailForVendor(vendorId, bookingId) {
   };
 }
 
-// Same "build from local date parts" approach the frontend already uses for
-// event dates — avoids the UTC-midnight parsing trap of new Date(dateString).
 function hasEventEnded(dateString, timeString) {
   if (!dateString || !timeString) return false;
   const [year, month, day] = dateString.split('-').map(Number);
@@ -295,9 +311,6 @@ function hasEventEnded(dateString, timeString) {
   return eventEnd <= new Date();
 }
 
-// Vendor marks a confirmed booking as completed — only once the event's end
-// time has actually passed, checked here too so the client-side gate can't
-// just be bypassed with a raw API call.
 async function markBookingCompleted(vendorId, bookingId) {
   const booking = await bookingModel.findByIdForVendor(bookingId, vendorId);
   if (!booking) {
@@ -325,9 +338,6 @@ async function markBookingCompleted(vendorId, bookingId) {
   return { id: updated.id, bookingStatus: STATUS_LABELS[updated.status] || 'Confirmed' };
 }
 
-// Vendor cancels a still-confirmed booking, recording why — cancelling an
-// already-completed or already-cancelled booking makes no sense, so both
-// are rejected the same way markBookingCompleted rejects a non-confirmed one.
 async function cancelBooking(vendorId, bookingId, reason) {
   const booking = await bookingModel.findByIdForVendor(bookingId, vendorId);
   if (!booking) {
@@ -351,17 +361,18 @@ function toLocalDate(dateString) {
   return new Date(year, month - 1, day);
 }
 
-// The vendor dashboard's "what's coming up" list — bookings that are still
-// active (not completed/cancelled) whose event date hasn't passed yet,
-// soonest first. Reuses listVendorBookings rather than re-deriving the
-// quotation/request joins it already does.
 async function getUpcomingEventsForVendor(vendorId, limit = 5) {
   const bookings = await listVendorBookings(vendorId);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   return bookings
-    .filter((booking) => booking.bookingStatus !== 'Completed' && booking.bookingStatus !== 'Cancelled')
+    .filter(
+      (booking) =>
+        booking.bookingStatus !== 'Completed' &&
+        booking.bookingStatus !== 'Cancelled' &&
+        booking.bookingStatus !== 'Declined'
+    )
     .filter((booking) => booking.eventDate && toLocalDate(booking.eventDate) >= today)
     .sort((a, b) => toLocalDate(a.eventDate) - toLocalDate(b.eventDate))
     .slice(0, limit)
@@ -375,8 +386,6 @@ async function getUpcomingEventsForVendor(vendorId, limit = 5) {
     }));
 }
 
-// Count of still-active bookings whose event date is exactly tomorrow —
-// used by the vendor dashboard's "needs your attention" summary.
 async function countBookingsStartingTomorrowForVendor(vendorId) {
   const bookings = await listVendorBookings(vendorId);
   const today = new Date();
@@ -388,20 +397,17 @@ async function countBookingsStartingTomorrowForVendor(vendorId) {
     (booking) =>
       booking.bookingStatus !== 'Completed' &&
       booking.bookingStatus !== 'Cancelled' &&
+      booking.bookingStatus !== 'Declined' &&
       booking.eventDate &&
       toLocalDate(booking.eventDate).getTime() === tomorrow.getTime()
   ).length;
 }
 
-// Same four labels Booking Management already shows per booking
-// (Confirmed/Pending Payment/Completed/Cancelled) — tallied into counts for
-// the vendor dashboard's Booking Status donut instead of listed individually,
-// via listVendorBookings so the two pages can never disagree on a status.
-const BOOKING_STATUS_SUMMARY_ORDER = ['Confirmed', 'Pending Payment', 'Completed', 'Cancelled'];
+const BOOKING_STATUS_SUMMARY_ORDER = ['Confirmed', 'Pending Payment', 'Completed', 'Cancelled', 'Declined'];
 
 async function getBookingStatusSummary(vendorId) {
   const bookings = await listVendorBookings(vendorId);
-  const counts = { Confirmed: 0, 'Pending Payment': 0, Completed: 0, Cancelled: 0 };
+  const counts = { Confirmed: 0, 'Pending Payment': 0, Completed: 0, Cancelled: 0, Declined: 0 };
 
   bookings.forEach((booking) => {
     if (counts[booking.bookingStatus] !== undefined) {

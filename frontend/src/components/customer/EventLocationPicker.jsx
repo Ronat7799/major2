@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createYellowMarkerIcon, loadLeaflet } from '../../utils/loadLeaflet.js';
 import { buildShortAddress, reverseGeocode, searchPlaces } from '../../utils/nominatim.js';
 
-const DEFAULT_CENTER = [11.5564, 104.9282]; // Phnom Penh
+const DEFAULT_CENTER = [11.5564, 104.9282]; 
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
@@ -138,7 +138,6 @@ export default function EventLocationPicker({ value, onChange, placeholder = 'Se
         mapInstanceRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function openPicker() {

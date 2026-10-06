@@ -4,10 +4,6 @@ const AppError = require('../utils/AppError');
 const COLUMNS =
   'id, booking_id, amount, payment_method, transaction_id, payment_status, payment_type, paid_at, created_at, updated_at';
 
-// Idempotent create, mirroring conversationModel.createInvite: a unique
-// violation on (booking_id, payment_type) means a concurrent request beat
-// us to it — re-fetch and hand back the row that already exists instead
-// of erroring.
 async function createPayment(fields) {
   const { data, error } = await supabase.from('payments').insert(fields).select(COLUMNS).single();
 
@@ -21,8 +17,6 @@ async function createPayment(fields) {
   return data;
 }
 
-// The "does this stage already have a row for this booking" lookup used
-// inside intent creation — one row max per (booking_id, payment_type).
 async function findByBookingIdAndType(booking_id, payment_type) {
   const { data, error } = await supabase
     .from('payments')
@@ -38,8 +32,6 @@ async function findByBookingIdAndType(booking_id, payment_type) {
   return data;
 }
 
-// All payment rows for one booking (0-2 today: deposit/balance, or a
-// single legacy 'full' row) — powers the payment summary/history reads.
 async function findAllByBookingId(booking_id) {
   const { data, error } = await supabase
     .from('payments')
@@ -54,8 +46,6 @@ async function findAllByBookingId(booking_id) {
   return data;
 }
 
-// Bulk lookup for list pages — returns ALL rows per booking (up to 2 today).
-// Callers must group by booking_id themselves rather than assume 1:1.
 async function findByBookingIds(booking_ids) {
   if (!booking_ids.length) {
     return [];

@@ -66,7 +66,7 @@ export default function FeaturedPromotions() {
   const [ref, visible] = useReveal();
 
   return (
-    <section ref={ref} className="mx-auto max-w-6xl px-6 py-14">
+    <section ref={ref} className="mx-auto max-w-[1600px] px-6 py-14">
       <div className="flex items-center justify-between">
         <div style={revealStyle(visible, 150)}>
           <p className="ui-yellow-text text-xs font-bold uppercase tracking-wide">Sponsored</p>
@@ -89,7 +89,7 @@ export default function FeaturedPromotions() {
             style={revealStyle(visible, 300 + index * 120)}
             className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
           >
-            <div className="h-36 w-full shrink-0 overflow-hidden bg-gray-100">
+            <div className="h-48 w-full shrink-0 overflow-hidden bg-gray-100">
               <img
                 src={promo.image}
                 alt={promo.title}

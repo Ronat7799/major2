@@ -1,10 +1,3 @@
--- Vendor-initiated chat invites: before a booking exists, a vendor may
--- invite a customer to chat about a quotation the customer asked to revise.
--- Reuses conversations (same participants+messages shape as a booking-based
--- chat) instead of a new table. Existing rows keep booking_id set and
--- quotation_id null; status defaults to 'accepted' so every pre-existing
--- conversation is unaffected.
-
 alter table public.conversations
   alter column booking_id drop not null;
 

@@ -2,7 +2,9 @@ const AppError = require('../utils/AppError');
 const vendorModel = require('../models/vendorModel');
 const quotationRequestModel = require('../models/quotationRequestModel');
 const quotationModel = require('../models/quotationModel');
+const serviceModel = require('../models/serviceModel');
 const storageService = require('./storageService');
+const quotationService = require('./quotationService');
 
 const MAX_INSPIRATION_IMAGES = 5;
 
@@ -18,7 +20,6 @@ function toNullableNumber(value) {
   return value === '' || value === null || value === undefined ? null : Number(value);
 }
 
-// EventDateTimePicker sends "09:00 AM" style strings; the column is a plain time.
 function toTimeColumn(value) {
   if (!value) {
     return null;
@@ -50,11 +51,6 @@ async function resolveVendorId(userId, vendorIdHint) {
   return vendor ? vendor.id : null;
 }
 
-// Real event vendors (catering, decoration, florists, ...) need genuine
-// lead time to prepare — same-day or next-day requests don't leave enough
-// room for the vendor to quote, the customer to accept (within the
-// quotation's own 48-hour response window), pay, and the vendor to
-// actually execute the event.
 const MIN_EVENT_LEAD_DAYS = 3;
 
 function isEventDateFarEnoughOut(eventDateString) {
@@ -64,6 +60,14 @@ function isEventDateFarEnoughOut(eventDateString) {
   earliestAllowed.setHours(0, 0, 0, 0);
   earliestAllowed.setDate(earliestAllowed.getDate() + MIN_EVENT_LEAD_DAYS);
   return eventDate >= earliestAllowed;
+}
+
+async function resolveRequestedServiceId(serviceId, vendorId) {
+  if (!serviceId) {
+    return null;
+  }
+  const service = await serviceModel.findById(serviceId);
+  return service && service.vendor_id === vendorId ? service.id : null;
 }
 
 async function submitRequest(customerId, payload, files = []) {
@@ -76,9 +80,12 @@ async function submitRequest(customerId, payload, files = []) {
     throw new AppError(400, `Event date must be at least ${MIN_EVENT_LEAD_DAYS} days from today.`);
   }
 
+  const serviceId = await resolveRequestedServiceId(payload.service_id, payload.vendor_id);
+
   const request = await quotationRequestModel.createRequest({
     customer_id: customerId,
     vendor_id: payload.vendor_id,
+    service_id: serviceId,
     event_type: payload.event_type,
     event_date: payload.event_date || null,
     start_time: toTimeColumn(payload.start_time),
@@ -123,12 +130,6 @@ function formatRangeLabel(min, max, prefix = '') {
   return `${prefix}${Number(value).toLocaleString('en-US')}`;
 }
 
-// A request's own status only ever says "quoted" once a vendor has sent
-// something — it never changes when the customer later asks for changes on
-// that quotation, so the list would otherwise show a revision request
-// looking identical to an ordinary awaiting-response quote. This overlays
-// the latest quotation's own status onto the label so it's visible without
-// opening the request.
 function latestQuotationByRequestId(quotations) {
   const map = new Map();
   for (const quotation of quotations) {
@@ -141,6 +142,8 @@ function latestQuotationByRequestId(quotations) {
 }
 
 async function listVendorRequests(userId, vendorIdHint) {
+  await quotationService.expireOverdueRevisionRequests();
+
   const vendorId = await resolveVendorId(userId, vendorIdHint);
   if (!vendorId) {
     return [];
@@ -179,6 +182,8 @@ function formatRequestCode(id) {
 }
 
 async function getVendorRequestDetail(userId, vendorIdHint, requestId) {
+  await quotationService.expireOverdueRevisionRequests();
+
   const vendorId = await resolveVendorId(userId, vendorIdHint);
   if (!vendorId) {
     throw new AppError(404, 'Quotation request not found.');
@@ -189,15 +194,13 @@ async function getVendorRequestDetail(userId, vendorIdHint, requestId) {
     throw new AppError(404, 'Quotation request not found.');
   }
 
-  const [services, images, latestQuotation] = await Promise.all([
+  const [services, images, latestQuotation, requestedService] = await Promise.all([
     quotationRequestModel.findServicesByRequestId(requestId),
     quotationRequestModel.findImagesByRequestId(requestId),
     quotationModel.findByRequestId(requestId),
+    row.service_id ? serviceModel.findById(row.service_id) : Promise.resolve(null),
   ]);
 
-  // Only needed so the vendor's revise form can start from the quotation
-  // being revised instead of a blank one — skipped otherwise since it's two
-  // extra queries most requests (not awaiting revision) never use.
   const [latestQuotationItems, latestQuotationCharges] =
     latestQuotation && latestQuotation.status === 'revision_requested'
       ? await Promise.all([
@@ -221,6 +224,9 @@ async function getVendorRequestDetail(userId, vendorIdHint, requestId) {
     budgetMin: row.budget_min,
     budgetMax: row.budget_max,
     description: row.additional_event_description,
+    requestedService: requestedService
+      ? { id: requestedService.id, serviceName: requestedService.service_name, category: requestedService.service_category }
+      : null,
     services: services.map((service) => service.service_category),
     images: images.map((image) => ({ id: image.id, image_url: image.image_url })),
     latestQuotation: latestQuotation
@@ -253,11 +259,6 @@ async function getVendorRequestDetail(userId, vendorIdHint, requestId) {
   };
 }
 
-// Vendor rejects a request outright, before ever sending a quotation — only
-// valid while it's still brand new ('pending'/"NEW"). Reuses the same
-// 'declined' status a customer declining an actual quotation already
-// produces (declineQuotation in quotationService.js) — from the request's
-// own lifecycle, "this vendor won't be doing it" reads the same either way.
 async function declineRequest(userId, vendorIdHint, requestId) {
   const vendorId = await resolveVendorId(userId, vendorIdHint);
   if (!vendorId) {
@@ -277,9 +278,6 @@ async function declineRequest(userId, vendorIdHint, requestId) {
   return { id: updated.id, status: STATUS_LABELS[updated.status] || updated.status.toUpperCase() };
 }
 
-// Customer withdraws a request they submitted, before any vendor has quoted
-// it. Once a quotation exists, withdrawing is done via declineQuotation
-// instead (quotationService.js) — this is scoped strictly to "still NEW".
 async function cancelRequest(customerId, requestId) {
   const request = await quotationRequestModel.findById(requestId);
   if (!request || request.customer_id !== customerId) {

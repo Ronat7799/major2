@@ -5,7 +5,7 @@ const TESTIMONIALS = [
     name: 'Sopha Nara',
     context: 'Wedding',
     rating: 5,
-    quote: 'Finding a vendor was so easy. Reab Jom connected us with a fantastic photographer and our photos are breathtaking!',
+    quote: 'Finding a vendor was so easy. ReabJom connected us with a fantastic photographer and our photos are breathtaking!',
   },
   {
     name: 'Dara Chilean',

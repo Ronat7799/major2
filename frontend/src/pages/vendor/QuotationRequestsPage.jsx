@@ -5,9 +5,6 @@ import api from '../../api/client';
 import { getErrorMessage } from '../../utils/apiError.js';
 import { QUOTATION_EVENT_TYPES } from '../../constants/auth.js';
 
-// Pre-acceptance events only — once a quotation is accepted it becomes a
-// booking, and that event (plus everything after it) belongs on the Booking
-// Management page's activity feed instead.
 const ACTIVITY_TYPES_PARAM = 'quotation_request,quotation_revision_requested';
 const ACTIVITY_PREVIEW_LIMIT = 3;
 const ACTIVITY_MODAL_LIMIT = 50;
@@ -20,9 +17,6 @@ function CloseIcon() {
   );
 }
 
-// Fetches its own, longer list on open rather than reusing the preview's 3
-// items — keeps the compact card's request small and this one only costs
-// anything when the vendor actually asks for it.
 function AllActivityModal({ onClose }) {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -248,9 +242,6 @@ function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// event_date comes back as a plain "YYYY-MM-DD" string (no time/offset); parsing
-// it with `new Date()` treats it as UTC midnight and can print the wrong day in
-// negative-UTC timezones, so build the local Date from the parts instead.
 function formatEventDate(dateString) {
   if (!dateString) {
     return 'Not specified';
@@ -592,30 +583,6 @@ export default function QuotationRequestsPage() {
                 >
                   {request.status}
                 </span>
-                {request.status === 'NEW' ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      navigate(`/vendor/quotation-requests/${request.id}/create-quotation`);
-                    }}
-                    className="ui-yellow ui-yellow-hover rounded-full px-5 py-2 text-sm font-semibold text-black shadow-sm transition-all hover:scale-[1.02]"
-                  >
-                    Create Quotation
-                  </button>
-                ) : null}
-                {request.status === 'REVISION REQUESTED' ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      navigate(`/vendor/quotation-requests/${request.id}/create-quotation`);
-                    }}
-                    className="ui-yellow ui-yellow-hover rounded-full px-5 py-2 text-sm font-semibold text-black shadow-sm transition-all hover:scale-[1.02]"
-                  >
-                    Revise Quotation
-                  </button>
-                ) : null}
               </div>
             </div>
           ))}

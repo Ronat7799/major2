@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../../api/client';
 import ImageLightbox from '../../components/ImageLightbox.jsx';
@@ -204,6 +204,98 @@ function StarRating({ value, size = 'text-sm' }) {
   );
 }
 
+function FilterIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path d="M3.5 5.5h13M6 10h8M8.5 14.5h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const REVIEW_SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'highest', label: 'Highest Rated' },
+  { value: 'lowest', label: 'Lowest Rated' },
+];
+
+function sortReviews(reviews, sort) {
+  return [...reviews].sort((a, b) => {
+    if (sort === 'highest') return b.rating - a.rating || new Date(b.created_at) - new Date(a.created_at);
+    if (sort === 'lowest') return a.rating - b.rating || new Date(b.created_at) - new Date(a.created_at);
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+}
+
+function MenuOption({ selected, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+        selected ? 'bg-[#F5C400] font-semibold text-black' : 'text-black/70 hover:bg-black/5'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ReviewSortMenu({ sort, onSortChange }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  const isSorted = sort !== 'newest';
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function handlePointerDown(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) setOpen(false);
+    }
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-label="Sort reviews"
+        aria-expanded={open}
+        className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+          open || isSorted ? 'border-[#F5C400] bg-[#F5C400] text-black' : 'border-gray-200 bg-white text-black/60 hover:border-gray-300 hover:text-black'
+        }`}
+      >
+        <FilterIcon />
+      </button>
+
+      {open ? (
+        <div className="login-modal-pop absolute right-0 top-12 z-20 w-52 rounded-2xl border border-gray-100 bg-white p-3 shadow-[0_20px_50px_rgba(0,0,0,0.12)]">
+          <p className="px-3 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wide text-black/40">Sort By</p>
+          {REVIEW_SORT_OPTIONS.map((option) => (
+            <MenuOption
+              key={option.value}
+              selected={sort === option.value}
+              onClick={() => {
+                onSortChange(option.value);
+                setOpen(false);
+              }}
+            >
+              {option.label}
+            </MenuOption>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function SectionHeading({ children }) {
   return <h2 className="ui-yellow-text text-2xl font-bold">{children}</h2>;
 }
@@ -221,7 +313,7 @@ function InfoRow({ icon, label, value, badge }) {
   return (
     <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
       <div className="flex items-center gap-4">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-black/50">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center text-black/50">
           {icon}
         </span>
         <div>
@@ -245,9 +337,6 @@ function VerifiedBadge() {
   );
 }
 
-// No API key needed for a basic "output=embed" iframe. Prefers exact
-// coordinates when the vendor has pinned a location; otherwise falls back to
-// a text-address search so the map still shows something useful.
 function buildMapEmbedUrl(vendor) {
   if (vendor.latitude != null && vendor.longitude != null) {
     return `https://www.google.com/maps?q=${vendor.latitude},${vendor.longitude}&z=15&output=embed`;
@@ -276,6 +365,7 @@ export default function VendorDetailPage() {
   const [activeTab, setActiveTab] = useState('portfolio');
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [reviewSort, setReviewSort] = useState('newest');
 
   useEffect(() => {
     let cancelled = false;
@@ -330,11 +420,11 @@ export default function VendorDetailPage() {
   }
 
   const { vendor, portfolio, portfolio_service_name, reviews, rating } = detail;
+  const visibleReviews = sortReviews(reviews, reviewSort);
   const mapEmbedUrl = buildMapEmbedUrl(vendor);
 
   return (
     <div className="page-fade-in">
-      {/* Hero */}
       <div className="relative h-[380px] w-full overflow-hidden bg-gray-200">
         {vendor.cover_image ? (
           <img src={vendor.cover_image} alt="" className="h-full w-full object-cover" />
@@ -387,7 +477,6 @@ export default function VendorDetailPage() {
         </div>
       </div>
 
-      {/* Company info bar */}
       <div className="border-b border-gray-100 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-6 py-6">
           <div className="flex items-center gap-4">
@@ -424,7 +513,9 @@ export default function VendorDetailPage() {
           <button
             type="button"
             onClick={() => {
-              const quotationPath = `/vendors/${vendorId}/quotation`;
+              const quotationPath = serviceId
+                ? `/vendors/${vendorId}/quotation?service=${serviceId}`
+                : `/vendors/${vendorId}/quotation`;
               if (user && user.role === 'customer') {
                 navigate(quotationPath);
               } else {
@@ -438,7 +529,6 @@ export default function VendorDetailPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex justify-between border-b border-gray-100">
           {TABS.map((tab) => (
@@ -604,18 +694,18 @@ export default function VendorDetailPage() {
 
               <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
                 <CardHeading>Socials &amp; Website</CardHeading>
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-[#1877F2]">
-                    <FacebookIcon />
+                <div className="flex items-center gap-4">
+                  <span className="flex items-center justify-center text-[#1877F2]">
+                    <FacebookIcon className="h-6 w-6" />
                   </span>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-[#E4405F]">
-                    <InstagramIcon />
+                  <span className="flex items-center justify-center text-[#E4405F]">
+                    <InstagramIcon className="h-6 w-6" />
                   </span>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-black">
-                    <TwitterIcon />
+                  <span className="flex items-center justify-center text-black">
+                    <TwitterIcon className="h-6 w-6" />
                   </span>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-[#0A66C2]">
-                    <LinkedinIcon />
+                  <span className="flex items-center justify-center text-[#0A66C2]">
+                    <LinkedinIcon className="h-6 w-6" />
                   </span>
                 </div>
               </div>
@@ -623,7 +713,12 @@ export default function VendorDetailPage() {
           </section>
         ) : (
           <section>
-            <SectionHeading>Customer Reviews</SectionHeading>
+            <div className="flex items-center justify-between gap-4">
+              <SectionHeading>Customer Reviews</SectionHeading>
+              {reviews.length > 0 ? (
+                <ReviewSortMenu sort={reviewSort} onSortChange={setReviewSort} />
+              ) : null}
+            </div>
 
             {rating.total > 0 ? (
               <div className="mt-3 flex items-center gap-3">
@@ -637,7 +732,7 @@ export default function VendorDetailPage() {
               <p className="mt-6 text-sm text-black/60">No customer reviews yet.</p>
             ) : (
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {reviews.map((review) => (
+                {visibleReviews.map((review) => (
                   <div key={review.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">

@@ -2,16 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
 import { getErrorMessage } from '../../utils/apiError.js';
+import VendorRating from '../../components/customer/VendorRating.jsx';
 
-function StarIcon({ filled }) {
+function ClockIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill={filled ? 'currentColor' : 'none'} aria-hidden="true">
-      <path
-        d="M10 2.5l2.2 4.6 5 .7-3.6 3.6.9 5-4.5-2.4-4.5 2.4.9-5-3.6-3.6 5-.7L10 2.5Z"
-        stroke="currentColor"
-        strokeWidth={filled ? 0 : 1.3}
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+      <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M10 6v4l3 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -86,10 +83,40 @@ const STATUS_STYLES = {
   Confirmed: 'bg-blue-50 text-blue-600',
   Completed: 'bg-green-50 text-green-600',
   Cancelled: 'bg-red-50 text-red-600',
+  Declined: 'bg-orange-50 text-orange-600',
 };
 
-const FILTERS = ['All', 'Pending Payment', 'Confirmed', 'Completed', 'Cancelled'];
+const FILTERS = ['All', 'Pending Payment', 'Confirmed', 'Completed', 'Cancelled', 'Declined'];
 const PAGE_SIZE = 6;
+
+function pad(value) {
+  return String(value).padStart(2, '0');
+}
+
+// Deposit deadline pill for a booking card — a live countdown while the
+// deposit is unpaid, or "Expired" once the booking was auto-declined.
+function depositDeadlineBadge(booking, nowTick) {
+  if (booking.depositExpired) {
+    return { label: 'Expired', style: 'bg-gray-100 text-gray-500' };
+  }
+  if (!booking.depositDueAt) {
+    return null;
+  }
+
+  const diffMs = new Date(booking.depositDueAt).getTime() - nowTick;
+  if (diffMs <= 0) {
+    return { label: 'Expired', style: 'bg-gray-100 text-gray-500' };
+  }
+
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  let style = 'text-green-600 bg-green-50';
+  if (hours < 4) style = 'text-red-600 bg-red-50';
+  else if (hours < 12) style = 'text-orange-600 bg-orange-50';
+
+  return { label: `Pay deposit in ${pad(hours)}h ${pad(minutes)}m`, style };
+}
 
 export default function MyBookingsPage() {
   const navigate = useNavigate();
@@ -98,6 +125,12 @@ export default function MyBookingsPage() {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('All');
   const [page, setPage] = useState(1);
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +175,7 @@ export default function MyBookingsPage() {
   }
 
   return (
-    <div className="page-fade-in mx-auto max-w-6xl px-6 py-10">
+    <div className="page-fade-in mx-auto max-w-[1600px] px-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="ui-yellow-text text-3xl font-extrabold tracking-tight sm:text-4xl">My Bookings</h1>
@@ -194,81 +227,82 @@ export default function MyBookingsPage() {
         </div>
       ) : (
         <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
-          {paginatedBookings.map((booking) => (
-            <div
-              key={booking.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(`/customer/bookings/${booking.id}`)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate(`/customer/bookings/${booking.id}`);
-                }
-              }}
-              className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span
-                  className={`inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${
-                    STATUS_STYLES[booking.status] || STATUS_STYLES.Confirmed
-                  }`}
-                >
-                  {booking.status}
-                </span>
-                <span className="text-xs font-semibold text-black/35">{booking.bookingCode}</span>
-              </div>
-
-              <div className="mt-3 flex items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-black text-sm font-semibold text-white">
-                  {booking.vendorLogo ? (
-                    <img src={booking.vendorLogo} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    initialsOf(booking.vendorName)
-                  )}
+          {paginatedBookings.map((booking) => {
+            const deadlineBadge = depositDeadlineBadge(booking, nowTick);
+            return (
+              <div
+                key={booking.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/customer/bookings/${booking.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    navigate(`/customer/bookings/${booking.id}`);
+                  }
+                }}
+                className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    className={`inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                      STATUS_STYLES[booking.status] || STATUS_STYLES.Confirmed
+                    }`}
+                  >
+                    {booking.status}
+                  </span>
+                  <span className="text-xs font-semibold text-black/35">{booking.bookingCode}</span>
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-bold text-black">{booking.vendorName}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {booking.eventType ? (
-                      <span className="ui-yellow rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-black">
-                        {booking.eventType}
+
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-black text-sm font-semibold text-white">
+                    {booking.vendorLogo ? (
+                      <img src={booking.vendorLogo} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      initialsOf(booking.vendorName)
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate text-base font-bold text-black">{booking.vendorName}</p>
+                      <VendorRating average={booking.ratingAverage} />
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {booking.eventType ? (
+                        <span className="ui-yellow rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-black">
+                          {booking.eventType}
+                        </span>
+                      ) : null}
+                      <span className="flex items-center gap-1 text-xs text-black/45">
+                        <CalendarIcon /> {formatDate(booking.bookingDate)}
                       </span>
-                    ) : null}
-                    <span className="flex items-center gap-1 text-xs text-black/45">
-                      <CalendarIcon /> {formatDate(booking.bookingDate)}
-                    </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {booking.eventLocation ? (
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-black/45">
-                  <PinIcon /> {booking.eventLocation}
-                </p>
-              ) : null}
+                {booking.eventLocation ? (
+                  <p className="mt-3 flex items-center gap-1.5 text-xs text-black/45">
+                    <PinIcon /> {booking.eventLocation}
+                  </p>
+                ) : null}
 
-              <div className="mt-4 border-t border-gray-100 pt-4">
-                <p className="text-2xl font-extrabold text-green-600">{formatMoney(booking.grandTotal)}</p>
-                <p className="text-xs font-medium text-black/45">Total Package</p>
-              </div>
+                <div className="mt-4 flex items-end justify-between gap-3 border-t border-gray-100 pt-4">
+                  <div>
+                    <p className="text-2xl font-extrabold text-green-600">{formatMoney(booking.grandTotal)}</p>
+                    <p className="text-xs font-medium text-black/45">Total Package</p>
+                  </div>
 
-              <div className="mt-3 flex items-center gap-1.5">
-                {booking.ratingAverage !== null ? (
-                  <>
-                    <span className="flex items-center gap-0.5 text-[#F5C400]">
-                      {Array.from({ length: 5 }, (_, index) => (
-                        <StarIcon key={index} filled={index < Math.round(booking.ratingAverage)} />
-                      ))}
+                  {deadlineBadge ? (
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${deadlineBadge.style}`}
+                    >
+                      <ClockIcon /> {deadlineBadge.label}
                     </span>
-                    <span className="text-sm font-bold text-black">{booking.ratingAverage.toFixed(1)}</span>
-                  </>
-                ) : (
-                  <span className="text-xs text-black/40">No reviews yet</span>
-                )}
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -19,4 +19,22 @@ async function createBalanceIntent(req, res, next) {
   }
 }
 
-module.exports = { createDepositIntent, createBalanceIntent };
+async function simulateDeposit(req, res, next) {
+  try {
+    const payment = await paymentService.simulatePaymentForBooking(req.auth.sub, req.params.id, 'deposit', req.body);
+    return success(res, 200, 'Deposit payment simulated.', payment);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function simulateBalance(req, res, next) {
+  try {
+    const payment = await paymentService.simulatePaymentForBooking(req.auth.sub, req.params.id, 'balance', req.body);
+    return success(res, 200, 'Balance payment simulated.', payment);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { createDepositIntent, createBalanceIntent, simulateDeposit, simulateBalance };

@@ -3,12 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import api from '../../api/client';
 
-// Total Revenue is wired to real data (backend/src/services/paymentService.js
-// getVendorRevenue). Every other card/section below is mock data — this page
-// has no further backend wiring yet. Shaped to match this app's real
-// vocabulary (booking statuses, activity types) so it reads as a plausible
-// real dashboard, not a generic template.
-
 function ChevronDownIcon() {
   return (
     <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
@@ -72,8 +66,6 @@ const STATUS_STYLES = {
   Cancelled: 'bg-red-50 text-red-600',
 };
 
-// Colors/labels only — GET /vendors/me/revenue-series (bucketed by the
-// backend to match this period) supplies the real total/changePercent/points.
 const OVERVIEW_PERIODS = [
   { value: 'daily', label: 'Daily' },
   { value: 'week', label: 'Last 7 Days' },
@@ -81,8 +73,6 @@ const OVERVIEW_PERIODS = [
   { value: 'year', label: 'Last Year' },
 ];
 
-// Cubic-bezier-through-midpoints — a lightweight way to get a smooth curve
-// through a handful of points without pulling in a charting/math library.
 function buildSmoothPath(points) {
   if (points.length < 2) return '';
   let d = `M ${points[0].x} ${points[0].y}`;
@@ -205,9 +195,6 @@ function formatRelativeTime(dateString) {
   return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
 }
 
-// Shared by every custom dropdown on this page (period filters) — closes on
-// an outside click or Escape, same interaction the event date picker uses
-// elsewhere in the app.
 function useClickOutsideClose(containerRef, active, onClose) {
   useEffect(() => {
     if (!active) {
@@ -232,9 +219,6 @@ function useClickOutsideClose(containerRef, active, onClose) {
   }, [active, containerRef, onClose]);
 }
 
-// Shared white-outline period filter used by card headers (Revenue Overview,
-// Booking Status). The Total Revenue stat card keeps its own bolder filled-
-// yellow pill since it's a visually distinct context, not duplicated here.
 function PeriodDropdown({ options, value, onChange }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
@@ -278,22 +262,18 @@ function PeriodDropdown({ options, value, onChange }) {
   );
 }
 
-// Mock only (see PROJECT_CONTEXT.md: one feature at a time, no backend logic
-// yet). The period filter here is UI-only by design — selecting an option
-// doesn't change this data, unlike Revenue Overview's filter.
 const BOOKING_STATUS_PERIODS = [
   { value: 'daily', label: 'Daily' },
   { value: 'week', label: 'This Week' },
   { value: 'month', label: 'This Month' },
 ];
 
-// Colors/order only — the actual counts come from GET /bookings/status-summary,
-// keyed by the same status labels Booking Management already shows per booking.
 const BOOKING_STATUS_META = {
   Confirmed: { key: 'confirmed', color: '#F5C400' },
   'Pending Payment': { key: 'pending', color: '#3B82F6' },
   Completed: { key: 'completed', color: '#22C55E' },
   Cancelled: { key: 'cancelled', color: '#EF4444' },
+  Declined: { key: 'declined', color: '#F97316' },
 };
 
 const TOP_SERVICES_PERIODS = [
@@ -574,7 +554,6 @@ export default function VendorDashboardPage() {
         <p className="mt-1 text-sm text-black/50">Welcome back, {user?.full_name}. Here's what's happening today.</p>
       </div>
 
-      {/* Summary cards */}
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <p className="text-sm font-bold uppercase tracking-wide text-black/45">Total Revenue</p>
@@ -626,7 +605,6 @@ export default function VendorDashboardPage() {
         </div>
       </div>
 
-      {/* Revenue Overview + Booking Status */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -662,7 +640,6 @@ export default function VendorDashboardPage() {
           )}
         </div>
 
-        {/* Booking Status */}
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -705,7 +682,6 @@ export default function VendorDashboardPage() {
         </div>
       </div>
 
-      {/* Top Services + Recent Activity */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -806,7 +782,6 @@ export default function VendorDashboardPage() {
         </div>
       </div>
 
-      {/* Upcoming Events */}
       <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-base font-bold text-black">Upcoming Events</h2>

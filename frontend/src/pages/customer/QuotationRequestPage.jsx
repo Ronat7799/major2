@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../../api/client';
 import { getErrorMessage } from '../../utils/apiError.js';
 import EventDateTimePicker from '../../components/customer/EventDateTimePicker.jsx';
 import EventLocationPicker from '../../components/customer/EventLocationPicker.jsx';
 import ImageLightbox from '../../components/ImageLightbox.jsx';
+import { BlurOverlay, LoadingOverlay } from '../../components/StatusOverlay.jsx';
 import { QUOTATION_EVENT_TYPES } from '../../constants/auth.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -248,13 +249,18 @@ function ServiceCheckboxCard({ label, icon, checked, onChange, className = '' })
   return (
     <label
       className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 transition-all duration-200 ${
-        checked ? 'border-[#F5C400] bg-[#F5C400]/10 shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+        checked ? 'border-[#F5C400] bg-[#F5C400] shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
       } ${className}`}
     >
-      <input type="checkbox" checked={checked} onChange={onChange} className="ui-yellow-accent h-4 w-4 shrink-0" />
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className={`h-4 w-4 shrink-0 ${checked ? 'accent-black' : 'ui-yellow-accent'}`}
+      />
       <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors duration-200 ${
-          checked ? 'bg-[#F5C400]/25 text-black' : 'bg-gray-100 text-black/55'
+        className={`flex h-8 w-8 shrink-0 items-center justify-center transition-colors duration-200 ${
+          checked ? 'text-black' : 'text-black/55'
         }`}
       >
         {icon}
@@ -268,17 +274,17 @@ export default function QuotationRequestPage() {
   const { vendorId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const requestedServiceId = searchParams.get('service');
   const { user, loading: authLoading } = useAuth();
 
   const [vendor, setVendor] = useState(null);
+  const [requestedService, setRequestedService] = useState(null);
   const [rating, setRating] = useState({ average: null, total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [bookedDates, setBookedDates] = useState([]);
 
-  // Must match MIN_EVENT_LEAD_DAYS in backend/src/services/quotationRequestService.js —
-  // this is just the calendar UX (grey out unselectable dates); the backend
-  // re-validates the same rule on submit regardless.
   const minEventDate = new Date();
   minEventDate.setHours(0, 0, 0, 0);
   minEventDate.setDate(minEventDate.getDate() + 3);
@@ -372,6 +378,11 @@ export default function QuotationRequestPage() {
           setVendor(response.data.data.vendor);
           setRating(response.data.data.rating);
           setError('');
+
+          if (requestedServiceId) {
+            const match = (response.data.data.services || []).find((service) => service.id === requestedServiceId);
+            setRequestedService(match || null);
+          }
         }
       })
       .catch((err) => {
@@ -388,7 +399,7 @@ export default function QuotationRequestPage() {
     return () => {
       cancelled = true;
     };
-  }, [vendorId]);
+  }, [vendorId, requestedServiceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -401,9 +412,6 @@ export default function QuotationRequestPage() {
         }
       })
       .catch(() => {
-        // Non-critical — worst case the calendar just doesn't grey out
-        // already-booked dates, and the server-side check at accept time
-        // still catches a real conflict.
       });
 
     return () => {
@@ -451,6 +459,9 @@ export default function QuotationRequestPage() {
     try {
       const formData = new FormData();
       formData.append('vendor_id', vendorId);
+      if (requestedService) {
+        formData.append('service_id', requestedService.id);
+      }
       formData.append('event_type', eventType);
       formData.append('event_date', toIsoDate(eventDateTime.date));
       formData.append('start_time', eventDateTime.startTime);
@@ -481,46 +492,7 @@ export default function QuotationRequestPage() {
   }
 
   if (loading || authLoading) {
-    return <p className="page-fade-in mx-auto max-w-3xl px-6 py-16 text-sm text-black/60">Loading…</p>;
-  }
-
-  if (submitted) {
-    return (
-      <div className="page-fade-in mx-auto max-w-xl px-6 py-20 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#F5C400]/15 text-[#F5C400]">
-          <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" aria-hidden="true">
-            <path
-              d="m5 13 4 4L19 7"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-        <h1 className="mt-6 text-2xl font-extrabold text-black">Request Sent!</h1>
-        <p className="mt-2 text-sm text-black/55">
-          Your event request has been sent to {vendor.company_name}. They&apos;ll review it and send you a
-          quotation soon.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <button
-            type="button"
-            onClick={() => navigate(`/vendors/${vendorId}`)}
-            className="rounded-full border border-gray-200 px-6 py-2.5 text-sm font-semibold text-black transition-colors duration-200 hover:bg-gray-50"
-          >
-            Back to Vendor
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/vendors')}
-            className="ui-yellow ui-yellow-hover rounded-full px-6 py-2.5 text-sm font-semibold text-black transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
-          >
-            Browse More Vendors
-          </button>
-        </div>
-      </div>
-    );
+    return <LoadingOverlay title="Loading request form..." message="Getting the vendor's details ready." />;
   }
 
   if (!user || user.role !== 'customer') {
@@ -584,7 +556,6 @@ export default function QuotationRequestPage() {
 
       <div className="mx-auto max-w-[900px] px-6 py-10">
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
-          {/* Vendor info */}
           <div className="rounded-2xl bg-[#F5C400]/10 p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-black/40">Sending Request To</p>
             <div className="mt-3 flex items-start gap-4">
@@ -623,11 +594,15 @@ export default function QuotationRequestPage() {
                 ) : null}
               </div>
             </div>
+            {requestedService ? (
+              <p className="mt-4 border-t border-black/10 pt-3 text-sm text-black/60">
+                Requesting about: <span className="font-semibold text-black">{requestedService.service_name}</span>
+              </p>
+            ) : null}
           </div>
 
           <div className="my-8 border-t border-gray-100" />
 
-          {/* Event Type */}
           <div>
             <FieldLabel>Event Type</FieldLabel>
             <div className="flex flex-wrap gap-2">
@@ -648,7 +623,6 @@ export default function QuotationRequestPage() {
             </div>
           </div>
 
-          {/* Event Date */}
           <div className="mt-7">
             <FieldLabel>Event Date &amp; Time</FieldLabel>
             <EventDateTimePicker
@@ -659,13 +633,11 @@ export default function QuotationRequestPage() {
             />
           </div>
 
-          {/* Location */}
           <div className="mt-7">
             <FieldLabel>Event Location</FieldLabel>
             <EventLocationPicker value={eventLocation} onChange={setEventLocation} />
           </div>
 
-          {/* Guests */}
           <div className="mt-7">
             <FieldLabel>Number of Guests</FieldLabel>
             <div className="grid grid-cols-2 gap-4">
@@ -686,7 +658,6 @@ export default function QuotationRequestPage() {
             </div>
           </div>
 
-          {/* Budget */}
           <div className="mt-7">
             <FieldLabel>Budget Range</FieldLabel>
             <div className="grid grid-cols-2 gap-4">
@@ -707,7 +678,6 @@ export default function QuotationRequestPage() {
             </div>
           </div>
 
-          {/* Required Services */}
           <div className="mt-7">
             <FieldLabel>Required Services</FieldLabel>
             <div className="space-y-5">
@@ -739,7 +709,6 @@ export default function QuotationRequestPage() {
             </div>
           </div>
 
-          {/* Description */}
           <div className="mt-7">
             <FieldLabel>Event Description</FieldLabel>
             <textarea
@@ -751,7 +720,6 @@ export default function QuotationRequestPage() {
             />
           </div>
 
-          {/* Inspiration Images */}
           <div className="mt-7">
             <FieldLabel>Upload Inspiration Images</FieldLabel>
 
@@ -860,6 +828,42 @@ export default function QuotationRequestPage() {
           </button>
         </div>
       </div>
+
+      {submitting ? (
+        <LoadingOverlay
+          title="Sending your request..."
+          message={`Please wait while we deliver your event details to ${vendor.company_name}.`}
+        />
+      ) : null}
+
+      {submitted ? (
+        <BlurOverlay>
+          <div className="success-pop mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+            <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" aria-hidden="true">
+              <path d="M5 12.5 10 17.5 19 7" stroke="#16A34A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <h1 className="mt-6 text-xl font-extrabold text-black">Request Sent!</h1>
+          <p className="mt-2 text-sm text-black/45">
+            Your event request has been sent to {vendor.company_name}. They&apos;ll review it and send you a
+            quotation soon.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/vendors')}
+            className="ui-yellow ui-yellow-hover mt-6 w-full rounded-full py-3.5 text-sm font-bold text-black shadow-sm transition-all hover:scale-[1.01] active:scale-100"
+          >
+            Browse More Vendors
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(`/vendors/${vendorId}`)}
+            className="mt-3 w-full rounded-full border border-gray-200 py-3.5 text-sm font-semibold text-black transition-colors hover:border-gray-300 hover:bg-gray-50"
+          >
+            Back to Vendor
+          </button>
+        </BlurOverlay>
+      ) : null}
     </div>
   );
 }

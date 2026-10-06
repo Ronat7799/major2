@@ -5,9 +5,6 @@ import api from '../../api/client';
 import { getErrorMessage } from '../../utils/apiError.js';
 import { QUOTATION_EVENT_TYPES } from '../../constants/auth.js';
 
-// Everything from the moment a quotation is accepted (i.e. becomes a
-// booking) onward — pre-acceptance events live on the Quotation Requests
-// page's activity feed instead.
 const ACTIVITY_TYPES_PARAM =
   'quotation_accepted,payment_deposit_paid,payment_balance_paid,booking_completed,booking_cancelled';
 const ACTIVITY_PREVIEW_LIMIT = 3;
@@ -40,9 +37,6 @@ function CloseIcon() {
   );
 }
 
-// Fetches its own, longer list on open rather than reusing the preview's 3
-// items — keeps the compact card's request small and this one only costs
-// anything when the vendor actually asks for it.
 function AllActivityModal({ onClose }) {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -247,7 +241,6 @@ function formatEventDate(dateString) {
   return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// No guests_min/guests_max means the customer didn't specify a headcount.
 function formatGuestsLabel(min, max) {
   const hasMin = min !== null && min !== undefined;
   const hasMax = max !== null && max !== undefined;
@@ -263,6 +256,7 @@ const BOOKING_STATUS_STYLES = {
   Confirmed: 'bg-green-50 text-green-600',
   Completed: 'bg-blue-50 text-blue-600',
   Cancelled: 'bg-red-50 text-red-600',
+  Declined: 'bg-orange-50 text-orange-600',
 };
 
 const PAYMENT_STATUS_STYLES = {
@@ -271,6 +265,8 @@ const PAYMENT_STATUS_STYLES = {
   Unpaid: 'bg-amber-50 text-amber-600',
   'Not Available': 'bg-gray-100 text-gray-500',
 };
+
+const PAGE_SIZE = 5;
 
 export default function BookingManagementPage() {
   const navigate = useNavigate();
@@ -283,6 +279,7 @@ export default function BookingManagementPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sort, setSort] = useState('newest');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -365,6 +362,29 @@ export default function BookingManagementPage() {
     return result;
   }, [bookings, search, statusFilter, categoryFilter, sort]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedBookings = filteredBookings.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  function updateAndResetPage(setter) {
+    return (value) => {
+      setter(value);
+      setPage(1);
+    };
+  }
+
+  function getPageNumbers() {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+    const pages = new Set([1, 2, totalPages - 1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+    return Array.from(pages)
+      .filter((value) => value >= 1 && value <= totalPages)
+      .sort((a, b) => a - b);
+  }
+
+  const pageNumbers = getPageNumbers();
+
   return (
     <div>
       <div>
@@ -428,7 +448,7 @@ export default function BookingManagementPage() {
           <input
             type="text"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => updateAndResetPage(setSearch)(event.target.value)}
             placeholder="Search bookings..."
             className="ui-yellow-border w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-black outline-none transition-shadow"
           />
@@ -440,7 +460,7 @@ export default function BookingManagementPage() {
           </span>
           <select
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
+            onChange={(event) => updateAndResetPage(setStatusFilter)(event.target.value)}
             className="ui-yellow-border appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-9 text-sm text-black outline-none transition-shadow"
           >
             <option value="">All Status</option>
@@ -461,7 +481,7 @@ export default function BookingManagementPage() {
           </span>
           <select
             value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
+            onChange={(event) => updateAndResetPage(setCategoryFilter)(event.target.value)}
             className="ui-yellow-border appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-9 text-sm text-black outline-none transition-shadow"
           >
             <option value="">All Categories</option>
@@ -482,7 +502,7 @@ export default function BookingManagementPage() {
           </span>
           <select
             value={sort}
-            onChange={(event) => setSort(event.target.value)}
+            onChange={(event) => updateAndResetPage(setSort)(event.target.value)}
             className="ui-yellow-border appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-9 text-sm text-black outline-none transition-shadow"
           >
             <option value="newest">Newest</option>
@@ -521,7 +541,7 @@ export default function BookingManagementPage() {
         <p className="mt-8 text-sm text-black/60">No bookings match your filters.</p>
       ) : (
         <div className="mt-6 space-y-4">
-          {filteredBookings.map((booking) => (
+          {paginatedBookings.map((booking) => (
             <div
               key={booking.id}
               role="button"
@@ -580,17 +600,62 @@ export default function BookingManagementPage() {
                   >
                     {booking.paymentStatus || 'Not Available'}
                   </span>
-                  <span
-                    className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${BOOKING_STATUS_STYLES[booking.bookingStatus]}`}
-                  >
-                    {booking.bookingStatus}
-                  </span>
+                  {booking.paymentStatus === 'Partially Paid' && booking.bookingStatus === 'Pending Payment' ? null : (
+                    <span
+                      className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${BOOKING_STATUS_STYLES[booking.bookingStatus]}`}
+                    >
+                      {booking.bookingStatus}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {filteredBookings.length > 0 ? (
+        <div className="mt-8 flex items-center justify-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={currentPage <= 1}
+            className="rounded-lg border border-gray-200 px-3.5 py-1.5 text-sm font-semibold text-black transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+
+          {pageNumbers.map((pageNumber, index) => {
+            const previous = pageNumbers[index - 1];
+            const showEllipsis = previous !== undefined && pageNumber - previous > 1;
+            return (
+              <span key={pageNumber} className="flex items-center gap-1.5">
+                {showEllipsis ? <span className="px-1 text-sm text-black/40">...</span> : null}
+                <button
+                  type="button"
+                  onClick={() => setPage(pageNumber)}
+                  className={`h-9 w-9 rounded-lg border text-sm font-semibold transition-colors ${
+                    pageNumber === currentPage
+                      ? 'ui-yellow border-transparent text-black'
+                      : 'border-gray-200 text-black hover:bg-gray-50'
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              </span>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            disabled={currentPage >= totalPages}
+            className="rounded-lg border border-gray-200 px-3.5 py-1.5 text-sm font-semibold text-black transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      ) : null}
 
       {showActivityModal ? <AllActivityModal onClose={() => setShowActivityModal(false)} /> : null}
     </div>

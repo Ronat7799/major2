@@ -42,21 +42,6 @@ function CancelIcon() {
   );
 }
 
-function WarningIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-      <path
-        d="M12 3.5 21.5 20h-19L12 3.5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path d="M12 9.5v4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="12" cy="17" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-
 function CalendarIcon() {
   return (
     <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -153,9 +138,6 @@ function formatTime(timeString) {
   return `${displayHour}:${minuteStr} ${period}`;
 }
 
-// Normalizes "HH:MM" or "HH:MM:SS" into "HH:MM:SS" so it's always safe to
-// append to a date for a Date() constructor — Postgres time columns come
-// back with seconds already, unlike the "HH:MM" the mock data used.
 function toIsoTime(timeString) {
   if (!timeString) return null;
   const [hh = '00', mm = '00', ss = '00'] = timeString.split(':');
@@ -189,6 +171,7 @@ const BOOKING_STATUS_STYLES = {
   Confirmed: 'bg-green-50 text-green-600',
   Completed: 'bg-blue-50 text-blue-600',
   Cancelled: 'bg-red-50 text-red-600',
+  Declined: 'bg-orange-50 text-orange-600',
 };
 
 function DetailField({ icon, label, value }) {
@@ -211,8 +194,6 @@ const CANCELLATION_REASONS = [
   'Other',
 ];
 
-// Portalled to <body>, same reasoning as ImageLightbox: a fixed overlay
-// needs to sit against the real viewport, not a transformed ancestor.
 function CancelBookingModal({ customerName, onClose, onConfirm }) {
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
@@ -248,11 +229,7 @@ function CancelBookingModal({ customerName, onClose, onConfirm }) {
         onClick={(event) => event.stopPropagation()}
         className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl sm:p-7"
       >
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
-          <WarningIcon />
-        </div>
-
-        <h2 className="mt-4 text-lg font-bold text-black">Cancel this booking?</h2>
+        <h2 className="text-lg font-bold text-black">Cancel this booking?</h2>
         <p className="mt-1 text-sm text-black/50">
           This will notify {customerName} and cannot be undone.
         </p>
@@ -380,8 +357,6 @@ export default function BookingDetailPage() {
     );
   }
 
-  // "Other" carries no information as a chip — its detail already lives in
-  // the event description.
   const displayedServices = booking.requiredServices.filter(
     (service) => service.trim().toLowerCase() !== 'other' && !service.trim().toLowerCase().startsWith('other:')
   );
@@ -413,7 +388,6 @@ export default function BookingDetailPage() {
 
   return (
     <div className="pb-4">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-black/45">
         <button
           type="button"
@@ -430,7 +404,6 @@ export default function BookingDetailPage() {
         <span className="font-semibold text-black">Booking Details</span>
       </div>
 
-      {/* Header */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-extrabold text-black sm:text-[28px]">Booking Details</h1>
@@ -490,15 +463,16 @@ export default function BookingDetailPage() {
         </p>
       ) : null}
 
-      {booking.bookingStatus === 'Cancelled' && booking.cancellationReason ? (
+      {(booking.bookingStatus === 'Cancelled' || booking.bookingStatus === 'Declined') && booking.cancellationReason ? (
         <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-red-600/70">Cancellation Reason</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-600/70">
+            {booking.bookingStatus === 'Declined' ? 'Decline Reason' : 'Cancellation Reason'}
+          </p>
           <p className="mt-1 text-sm text-red-700">{booking.cancellationReason}</p>
         </div>
       ) : null}
 
       <div className="mt-6 space-y-6">
-        {/* Customer Information */}
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="ui-yellow-text text-base font-bold">Customer Information</h2>
           <div className="mt-4 border-t border-gray-100 pt-4">
@@ -528,7 +502,6 @@ export default function BookingDetailPage() {
           </div>
         </div>
 
-        {/* Event Summary */}
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="ui-yellow-text text-base font-bold">Event Summary</h2>
           <div className="mt-4 grid grid-cols-1 gap-5 border-t border-gray-100 pt-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -571,7 +544,6 @@ export default function BookingDetailPage() {
           </div>
         </div>
 
-        {/* Payment Summary */}
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="ui-yellow-text text-base font-bold">Payment Summary</h2>
           <div className="mt-4 border-t border-gray-100 pt-4">

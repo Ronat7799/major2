@@ -38,7 +38,7 @@ export default function LoginPage() {
 
   return (
     <AuthModal maxWidthClassName="max-w-3xl" brandPanel brandImage={loginPanelImage}>
-      <p className="ui-yellow-text text-sm font-bold tracking-tight">Reab Jom</p>
+      <p className="ui-yellow-text text-sm font-bold tracking-tight">ReabJom</p>
       <h1 className="mt-2 text-2xl font-extrabold text-black sm:text-3xl">Welcome Back!</h1>
       <p className="mt-1.5 text-sm text-black/55">Enter your credentials to access your account.</p>
 

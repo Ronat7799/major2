@@ -4,7 +4,6 @@ import api from '../../api/client';
 import { getErrorMessage } from '../../utils/apiError.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
-// UI-only mock data — wire up to the real profile/vendor endpoints later.
 const MOCK_PROFILE_DETAILS = {
   phone: '+855 12 345 678',
   date_of_birth: 'March 15, 1995',
@@ -40,10 +39,8 @@ const MOCK_VENDORS = [
   },
 ];
 
-// Soft, layered shadow shared by every card on this page for a consistent, premium feel.
 const CARD_SHADOW = 'shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_rgba(16,24,40,0.06)]';
 
-// UI-only — toggling flips local state only, nothing is persisted.
 const DEFAULT_SETTINGS = [
   { key: 'email_notifications', label: 'Email Notifications', enabled: true },
   { key: 'sms_notifications', label: 'SMS Notifications', enabled: false },
@@ -458,7 +455,6 @@ export default function CustomerProfilePage() {
     try {
       await api.delete(`/saved-services/${service.service_id}`);
     } catch {
-      // Put it back if the request failed.
       setSavedServices((current) => [...current, service]);
     }
   }
@@ -466,12 +462,12 @@ export default function CustomerProfilePage() {
   return (
     <div className="page-fade-in min-h-screen bg-[#f8f9fb]">
       <div className="border-b border-gray-100 bg-[#f4f5f7] px-6 py-10">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <h1 className="ui-yellow-text text-3xl font-extrabold tracking-tight">My Profile</h1>
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="mx-auto max-w-[1600px] px-6 py-10">
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[280px_1fr]">
           <ProfileSidebar
             user={user}

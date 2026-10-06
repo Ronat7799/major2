@@ -314,8 +314,6 @@ export default function QuotationDetailPage() {
   const statusLabel = STATUS_LABELS[quotation.status] || 'Pending';
   const isPending = statusLabel === 'Pending';
 
-  // "Other" carries no information as a chip — its detail already lives in the
-  // event description (see buildFinalDescription on the customer request form).
   const displayedServices = quotation.event.requiredServices.filter(
     (service) => service.trim().toLowerCase() !== 'other' && !service.trim().toLowerCase().startsWith('other:')
   );
@@ -364,14 +362,16 @@ export default function QuotationDetailPage() {
 
         {isPending && !expired ? (
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setShowRequestChanges((current) => !current)}
-              disabled={acting !== ''}
-              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Request Changes
-            </button>
+            {quotation.canRequestChanges ? (
+              <button
+                type="button"
+                onClick={() => setShowRequestChanges((current) => !current)}
+                disabled={acting !== ''}
+                className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Request Changes
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={handleAccept}
@@ -394,7 +394,7 @@ export default function QuotationDetailPage() {
         ) : null}
       </div>
 
-      {isPending && !expired && showRequestChanges ? (
+      {isPending && !expired && quotation.canRequestChanges && showRequestChanges ? (
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
           <label className="text-xs font-semibold uppercase tracking-wide text-black/40" htmlFor="changes-note">
             What would you like changed?
@@ -516,9 +516,7 @@ export default function QuotationDetailPage() {
       ) : null}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left column */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Event Summary */}
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="ui-yellow-text text-base font-bold">Event Summary</h2>
             <div className="mt-4 grid grid-cols-1 gap-5 border-t border-gray-100 pt-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -559,7 +557,6 @@ export default function QuotationDetailPage() {
             </div>
           </div>
 
-          {/* Quotation Summary: services, additional charges, grand total, and the vendor's message all in one card */}
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="ui-yellow-text text-base font-bold">Quotation Summary</h2>
 
@@ -597,31 +594,10 @@ export default function QuotationDetailPage() {
               </p>
             ) : null}
 
-            {statusLabel === 'Accepted' && quotation.payment && !quotation.payment.deposit.paid ? (
-              <button
-                type="button"
-                onClick={() => navigate(`/customer/quotations/${id}/payment?stage=deposit`)}
-                className="ui-yellow ui-yellow-hover mt-5 w-full rounded-full py-3.5 text-sm font-bold text-black shadow-sm transition-all hover:scale-[1.01] active:scale-100"
-              >
-                Pay Deposit
-              </button>
-            ) : null}
-
-            {statusLabel === 'Accepted' && quotation.payment?.deposit.paid && !quotation.payment.balance.paid ? (
-              <button
-                type="button"
-                onClick={() => navigate(`/customer/quotations/${id}/payment?stage=balance`)}
-                className="ui-yellow ui-yellow-hover mt-5 w-full rounded-full py-3.5 text-sm font-bold text-black shadow-sm transition-all hover:scale-[1.01] active:scale-100"
-              >
-                Pay Balance
-              </button>
-            ) : null}
           </div>
         </div>
 
-        {/* Right column */}
         <div className="space-y-6">
-          {/* Vendor Information */}
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="text-base font-bold text-black">Your Vendor</h2>
             <div className="mt-4 flex items-center gap-3 border-t border-gray-100 pt-4">
@@ -685,7 +661,6 @@ export default function QuotationDetailPage() {
             </button>
           </div>
 
-          {/* Quotation Status */}
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="text-base font-bold text-black">Quotation Status</h2>
             <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">

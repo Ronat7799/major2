@@ -16,6 +16,7 @@ export default function LocationView({ latitude, longitude }) {
     }
 
     let cancelled = false;
+    let resizeObserver;
 
     loadLeaflet()
       .then((L) => {
@@ -33,11 +34,13 @@ export default function LocationView({ latitude, longitude }) {
           doubleClickZoom: false,
         });
         L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map);
-        // clickable: false so a click landing on the pin still reaches the
-        // wrapping link below instead of being swallowed by the marker.
         L.marker(position, { icon: createYellowMarkerIcon(L), clickable: false }).addTo(map);
 
         mapInstanceRef.current = map;
+
+        requestAnimationFrame(() => map.invalidateSize());
+        resizeObserver = new ResizeObserver(() => map.invalidateSize());
+        resizeObserver.observe(mapRef.current);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -47,6 +50,9 @@ export default function LocationView({ latitude, longitude }) {
 
     return () => {
       cancelled = true;
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -56,22 +62,22 @@ export default function LocationView({ latitude, longitude }) {
 
   if (!hasLocation) {
     return (
-      <div className="flex h-40 w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-black/40">
+      <div className="flex h-full min-h-64 w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-black/40">
         No location set
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="h-full">
       <a
         href={`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`}
         target="_blank"
         rel="noopener noreferrer"
         title="Open in Google Maps"
-        className="block"
+        className="block h-full"
       >
-        <div ref={mapRef} className="h-40 w-full cursor-pointer rounded-lg border border-gray-200 bg-gray-50 hover:opacity-90" />
+        <div ref={mapRef} className="h-full min-h-64 w-full cursor-pointer rounded-lg border border-gray-200 bg-gray-50 hover:opacity-90" />
       </a>
       {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
     </div>

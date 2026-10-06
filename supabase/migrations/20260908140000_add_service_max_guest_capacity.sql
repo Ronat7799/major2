@@ -1,5 +1,3 @@
--- Service form now captures a guest capacity range; minimum_guest_capacity already
--- exists but the table has no maximum counterpart yet.
 alter table public.services
   add column maximum_guest_capacity integer;
 

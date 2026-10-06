@@ -9,22 +9,11 @@ function CloseIcon() {
   );
 }
 
-/**
- * Shared chrome for every auth screen (login, register choice, customer/vendor
- * register): dimmed + blurred backdrop, centered card, Esc/click-outside/✕ to
- * close. When opened from inside the app (see backgroundLocation usage in
- * App.jsx) closing pops back to the page underneath; opened directly it goes home.
- */
 export default function AuthModal({ children, maxWidthClassName = 'max-w-md', brandPanel = false, brandImage = null }) {
   const navigate = useNavigate();
   const location = useLocation();
   const backgroundLocation = location.state?.backgroundLocation;
 
-  // Chained auth screens (e.g. Login -> Sign Up -> Register as Customer) each
-  // push their own history entry, so navigate(-1) only ever unwinds one step
-  // of the chain instead of exiting it — jumping straight to the original
-  // backgroundLocation's path returns to the real page regardless of how
-  // many auth screens were visited in between.
   function closeModal() {
     if (backgroundLocation) {
       const target = `${backgroundLocation.pathname}${backgroundLocation.search || ''}${backgroundLocation.hash || ''}`;
@@ -49,7 +38,6 @@ export default function AuthModal({ children, maxWidthClassName = 'max-w-md', br
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundLocation]);
 
   return (
@@ -70,22 +58,22 @@ export default function AuthModal({ children, maxWidthClassName = 'max-w-md', br
           <div className="hidden shrink-0 flex-col bg-[#F5C400] p-8 sm:flex sm:w-2/5">
             {brandImage ? (
               <div className="flex h-full flex-col items-center text-center">
-                <p className="text-xl font-extrabold tracking-tight text-black">Reab Jom</p>
+                <p className="text-xl font-extrabold tracking-tight text-black">ReabJom</p>
                 <p className="mt-3 text-2xl font-extrabold leading-snug text-black">Plan Your Perfect Event</p>
                 <div className="mt-6 w-full flex-1 overflow-hidden rounded-2xl">
                   <img src={brandImage} alt="" className="h-full w-full object-cover" />
                 </div>
                 <p className="mt-6 w-full text-left text-xs font-medium text-black/55">
-                  © {new Date().getFullYear()} Reab Jom
+                  © {new Date().getFullYear()} ReabJom
                 </p>
               </div>
             ) : (
               <div className="flex h-full flex-col justify-between">
                 <div>
-                  <p className="text-xl font-extrabold tracking-tight text-black">Reab Jom</p>
+                  <p className="text-xl font-extrabold tracking-tight text-black">ReabJom</p>
                   <p className="mt-6 text-2xl font-extrabold leading-snug text-black">Plan Your Perfect Event</p>
                 </div>
-                <p className="text-xs font-medium text-black/55">© {new Date().getFullYear()} Reab Jom</p>
+                <p className="text-xs font-medium text-black/55">© {new Date().getFullYear()} ReabJom</p>
               </div>
             )}
           </div>

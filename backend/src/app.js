@@ -23,14 +23,12 @@ app.use(
   })
 );
 
-// Mounted before express.json() — Stripe signature verification needs the
-// raw, unparsed request body, not the parsed object express.json() produces.
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), webhookController.handleStripeWebhook);
 
 app.use(express.json());
 
 app.get('/health', (req, res) => {
-  res.json({ success: true, message: 'Reabjom API is running.' });
+  res.json({ success: true, message: 'ReabJom API is running.' });
 });
 
 app.use('/auth', authRoutes);

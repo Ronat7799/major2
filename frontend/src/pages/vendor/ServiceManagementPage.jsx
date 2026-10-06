@@ -127,7 +127,6 @@ export default function ServiceManagementPage() {
 
     const timeoutId = setTimeout(loadServices, 300);
     return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   async function loadServices() {

@@ -29,9 +29,6 @@ function initialsOf(name) {
     .join('');
 }
 
-// Polled rather than pushed in real time — notifications aren't latency
-// sensitive enough to need a socket (chat already has one for messages,
-// this deliberately doesn't reuse it).
 const UNREAD_POLL_MS = 45000;
 
 export default function VendorTopbar() {
@@ -49,7 +46,6 @@ export default function VendorTopbar() {
           setProfileImage(response.data.data.profile.profile_image || null);
         }
       } catch {
-        // Topbar avatar is decorative; fall back to initials on failure.
       }
     }
 
@@ -71,7 +67,6 @@ export default function VendorTopbar() {
           }
         })
         .catch(() => {
-          // Badge is non-critical; leave the previous count showing.
         });
     }
 

@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import logo from '../../assets/logo.png';
 
 function BellIcon() {
   return (
@@ -33,7 +34,6 @@ const NAV_ITEMS = [
   { label: 'Quotations', to: '/customer/quotations', requiresAuth: true },
   { label: 'Bookings', to: '/customer/bookings', requiresAuth: true },
   { label: 'Messages', to: '/customer/messages', requiresAuth: true },
-  { label: 'Contact' },
 ];
 
 export default function CustomerNavbar() {
@@ -45,8 +45,9 @@ export default function CustomerNavbar() {
   return (
     <header className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link to="/" className="ui-yellow-text text-xl font-extrabold tracking-tight">
-          Reab Jom
+        <Link to="/" className="ui-yellow-text flex items-center gap-2 text-xl font-extrabold tracking-tight">
+          <img src={logo} alt="" className="h-7 w-auto" />
+          ReabJom
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
@@ -82,9 +83,13 @@ export default function CustomerNavbar() {
               <button
                 type="button"
                 onClick={() => navigate('/customer/profile')}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-black text-xs font-semibold text-white transition-transform duration-200 hover:scale-110"
+                className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-black text-xs font-semibold text-white transition-transform duration-200 hover:scale-110"
               >
-                {initialsOf(user?.full_name)}
+                {user?.profile_image ? (
+                  <img src={user.profile_image} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  initialsOf(user?.full_name)
+                )}
               </button>
             </>
           ) : (

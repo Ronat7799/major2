@@ -15,9 +15,6 @@ async function findByVendorId(vendor_id) {
   return data;
 }
 
-// Bulk lookup for list pages (Browse Vendors) — one query for every vendor's
-// reviews instead of one query per vendor. Callers group by vendor_id
-// themselves, same pattern as serviceModel.findActiveByVendorIds.
 async function findByVendorIds(vendor_ids) {
   if (!vendor_ids.length) {
     return [];

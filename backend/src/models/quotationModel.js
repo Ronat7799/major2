@@ -5,11 +5,6 @@ const BASE_COLUMNS =
   'id, quotation_request_id, vendor_id, service_subtotal, additional_charges, platform_fee, grand_total, service_message, status, created_at, updated_at';
 const QUOTATION_COLUMNS = `${BASE_COLUMNS}, parent_quotation_id, revision_number, revision_note, revised_at, expires_at`;
 
-// The revision columns (migration 20260913000000) may not exist yet on a
-// database that hasn't been migrated — falling back to the base columns lets
-// every pre-existing quotation feature (create, list, accept, decline, view)
-// keep working in that case; only the new revision-specific behavior needs
-// the migration to actually be applied.
 function isMissingColumnError(error) {
   return error?.code === '42703';
 }
@@ -48,10 +43,6 @@ async function createQuotationItems(quotation_id, items) {
 
   let { error } = await supabase.from('quotation_items').insert(rows);
 
-  // service_id (migration 20260919000000) may not exist yet — fall back to
-  // the pre-migration columns so quotation creation itself never breaks
-  // waiting on it; the Top Services ranking just won't have data until the
-  // migration runs.
   if (error && isMissingColumnError(error)) {
     ({ error } = await supabase.from('quotation_items').insert(rows.map(({ service_id, ...rest }) => rest)));
   }
@@ -103,9 +94,6 @@ async function findByRequestIds(quotation_request_ids) {
   return data;
 }
 
-// A request can now have a chain of quotations (revisions kept as history
-// rows instead of being overwritten) — this returns only the newest one,
-// which is what every existing caller actually wants.
 async function findByRequestId(quotation_request_id) {
   let { data, error } = await supabase
     .from('quotation')
@@ -130,7 +118,6 @@ async function findByRequestId(quotation_request_id) {
   return data?.[0] || null;
 }
 
-// Every quotation for a request, oldest first — the full revision chain.
 async function findChainByRequestId(quotation_request_id) {
   let { data, error } = await supabase
     .from('quotation')
@@ -172,10 +159,10 @@ async function updateStatus(id, status) {
   return data;
 }
 
-async function markRevisionRequested(id, note) {
+async function markRevisionRequested(id, note, expiresAt) {
   const { data, error } = await supabase
     .from('quotation')
-    .update({ status: 'revision_requested', revision_note: note || null })
+    .update({ status: 'revision_requested', revision_note: note || null, expires_at: expiresAt })
     .eq('id', id)
     .select(QUOTATION_COLUMNS)
     .maybeSingle();
@@ -185,6 +172,20 @@ async function markRevisionRequested(id, note) {
   }
 
   return data;
+}
+
+async function findOverdueRevisionRequests() {
+  const { data, error } = await supabase
+    .from('quotation')
+    .select('id, quotation_request_id')
+    .eq('status', 'revision_requested')
+    .lte('expires_at', new Date().toISOString());
+
+  if (error) {
+    throw new AppError(500, error.message || 'Unable to check overdue revision requests.');
+  }
+
+  return data || [];
 }
 
 async function markRevised(id) {
@@ -254,8 +255,6 @@ async function findItemsByQuotationId(quotation_id) {
   return data;
 }
 
-// Batched form of findItemsByQuotationId — used by the vendor dashboard's Top
-// Services ranking, which needs items across every booked quotation at once.
 async function findItemsByQuotationIds(quotation_ids) {
   if (!quotation_ids.length) {
     return [];
@@ -293,10 +292,6 @@ async function findChargesByQuotationId(quotation_id) {
   return data;
 }
 
-// Recent quotations for a vendor in a given status, with the customer's
-// name pulled through the parent quotation_requests row — used by the
-// Recent Activity feeds (vendor dashboard: 'accepted'; quotation requests
-// page: 'accepted' and 'revision_requested').
 async function listByVendorIdAndStatus(vendor_id, status, limit = 10) {
   const { data, error } = await supabase
     .from('quotation')
@@ -329,4 +324,5 @@ module.exports = {
   markRevisionRequested,
   markRevised,
   listByVendorIdAndStatus,
+  findOverdueRevisionRequests,
 };

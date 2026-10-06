@@ -8,11 +8,8 @@ const { reviewRules, cancelBookingRules, validateRequest } = require('../middlew
 
 const router = express.Router();
 
-// Open to both customers and vendors — the controller branches on
-// req.auth.role, same pattern as /conversations.
 router.get('/', authenticate, bookingController.listMine);
 
-// Kept before the /:id route below so "status-summary" isn't swallowed as an id.
 router.get('/status-summary', authenticate, requireRole('vendor'), bookingController.getStatusSummary);
 
 router.get('/:id', authenticate, bookingController.getOne);
@@ -31,6 +28,10 @@ router.post(
 router.post('/:id/pay-deposit', authenticate, requireRole('customer'), paymentController.createDepositIntent);
 
 router.post('/:id/pay-balance', authenticate, requireRole('customer'), paymentController.createBalanceIntent);
+
+router.post('/:id/simulate-deposit', authenticate, requireRole('customer'), paymentController.simulateDeposit);
+
+router.post('/:id/simulate-balance', authenticate, requireRole('customer'), paymentController.simulateBalance);
 
 router.post(
   '/:id/review',

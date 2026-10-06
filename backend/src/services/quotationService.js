@@ -13,21 +13,49 @@ async function loadValidServiceIds(vendorId) {
   return new Set(services.map((service) => service.id));
 }
 
-// How long a customer has to accept/decline/request changes on a quotation
-// before it auto-expires. Real, server-enforced, and stored in expires_at —
-// unlike the old purely cosmetic countdown the frontend used to fake.
-const QUOTATION_EXPIRY_HOURS = 48;
-
-function computeExpiresAt() {
-  return new Date(Date.now() + QUOTATION_EXPIRY_HOURS * 3600000).toISOString();
+function attachRequestedService(items, requestedServiceId) {
+  if (!requestedServiceId || !items.length) {
+    return items;
+  }
+  const [first, ...rest] = items;
+  return [{ ...first, service_id: requestedServiceId }, ...rest];
 }
 
-// A quotation is only actually "pending" if it hasn't passed its own
-// expires_at — used by every action a customer can take on a quotation
-// (accept/decline/request changes) so the check can never be bypassed by
-// calling the API directly regardless of what the UI shows.
+const INITIAL_QUOTATION_EXPIRY_HOURS = 48;
+const REVISION_EXPIRY_HOURS = 24;
+// Customers get a single change request per quotation request: once the
+// vendor has sent a revised quotation, it can only be accepted or declined.
+const MAX_REVISION_NUMBER = 2;
+
+function canRequestChanges(quotation) {
+  return (quotation.revision_number || 1) < MAX_REVISION_NUMBER;
+}
+const DEPOSIT_PAYMENT_HOURS = 24;
+
+function computeExpiresAt(hours) {
+  return new Date(Date.now() + hours * 3600000).toISOString();
+}
+
 function isExpired(quotation) {
-  return quotation.status === 'pending' && Boolean(quotation.expires_at) && new Date(quotation.expires_at) <= new Date();
+  return (
+    (quotation.status === 'pending' || quotation.status === 'revision_requested') &&
+    Boolean(quotation.expires_at) &&
+    new Date(quotation.expires_at) <= new Date()
+  );
+}
+
+async function expireOverdueRevisionRequests() {
+  const overdue = await quotationModel.findOverdueRevisionRequests();
+  if (!overdue.length) {
+    return;
+  }
+
+  await Promise.all(
+    overdue.flatMap((quotation) => [
+      quotationModel.updateStatus(quotation.id, 'cancelled'),
+      quotationRequestModel.updateStatus(quotation.quotation_request_id, 'declined'),
+    ])
+  );
 }
 
 async function resolveVendorId(userId, vendorIdHint) {
@@ -42,10 +70,6 @@ function toNullableNumber(value) {
   return value === '' || value === null || value === undefined ? null : Number(value);
 }
 
-// validServiceIds scopes service_id to the vendor's own catalog — a vendor
-// can only link a line item to a service they actually own, and anything
-// else (including a plain custom/free-text item) silently stays unlinked
-// rather than erroring out the whole quotation.
 function normalizeItems(rawItems, validServiceIds = null) {
   const items = Array.isArray(rawItems) ? rawItems : [];
 
@@ -91,7 +115,7 @@ async function createQuotationForRequest(userId, vendorIdHint, requestId, payloa
   }
 
   const validServiceIds = await loadValidServiceIds(vendorId);
-  const items = normalizeItems(payload.items, validServiceIds);
+  const items = attachRequestedService(normalizeItems(payload.items, validServiceIds), request.service_id);
   if (!items.length) {
     throw new AppError(400, 'Add at least one service with a name, quantity, and unit price.');
   }
@@ -112,7 +136,7 @@ async function createQuotationForRequest(userId, vendorIdHint, requestId, payloa
     grand_total: grandTotal,
     service_message: payload.service_message ? String(payload.service_message).trim() : null,
     status: 'pending',
-    expires_at: computeExpiresAt(),
+    expires_at: computeExpiresAt(INITIAL_QUOTATION_EXPIRY_HOURS),
   });
 
   await Promise.all([
@@ -133,8 +157,6 @@ async function createQuotationForRequest(userId, vendorIdHint, requestId, payloa
   };
 }
 
-// Keeps only the newest quotation per request (by revision_number) — a
-// revision chain must show as one card, not one per historical version.
 function latestPerRequest(quotations) {
   const latestByRequestId = new Map();
   for (const quotation of quotations) {
@@ -146,12 +168,9 @@ function latestPerRequest(quotations) {
   return [...latestByRequestId.values()];
 }
 
-// A customer's own requests, newest first — one row per request. A request
-// that already has a quotation shows its latest revision; a request still
-// awaiting a vendor's response (no quotation yet) shows as its own
-// "hasQuotation: false" item instead of being omitted, so the customer can
-// see — and cancel — something they're still waiting on.
 async function listMyQuotations(customerId) {
+  await expireOverdueRevisionRequests();
+
   const requests = await quotationRequestModel.listByCustomerId(customerId);
   if (!requests.length) {
     return [];
@@ -194,10 +213,6 @@ async function listMyQuotations(customerId) {
     })
     .filter(Boolean);
 
-  // Distinct from the quoted-item status vocabulary below — a raw 'pending'
-  // here means "waiting on the vendor to quote", not "waiting on the
-  // customer to respond to a quotation", so it needs its own label rather
-  // than sharing the same word with a different meaning.
   const UNQUOTED_STATUS_LABELS = {
     pending: 'Awaiting Response',
     declined: 'Declined',
@@ -238,9 +253,6 @@ async function ratingForVendor(vendorId) {
   return { average, total };
 }
 
-// Loads a quotation + its request and checks the request belongs to this
-// customer, throwing 404 either way so a mismatched owner can't tell a
-// missing quotation apart from someone else's.
 async function loadOwnedQuotation(customerId, quotationId) {
   const quotation = await quotationModel.findById(quotationId);
   if (!quotation) {
@@ -259,9 +271,9 @@ function formatQuotationCode(id) {
   return `QT-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 }
 
-// Full breakdown of one quotation for the customer who received it — the
-// request must belong to them, regardless of which vendor sent the quote.
 async function getQuotationDetailForCustomer(customerId, quotationId) {
+  await expireOverdueRevisionRequests();
+
   const { quotation, request } = await loadOwnedQuotation(customerId, quotationId);
 
   const [items, charges, services, rating, vendor, completedEvents, booking, chain] = await Promise.all([
@@ -280,14 +292,9 @@ async function getQuotationDetailForCustomer(customerId, quotationId) {
     booking ? paymentService.getPaymentSummaryForBooking(booking.id) : Promise.resolve(null),
   ]);
 
-  // A vendor-sent chat invite only ever exists pre-booking, while the
-  // customer's revision request is still pending — kept separate from
-  // conversationId above, which stays booking-only as it always has.
   const invite =
     quotation.status === 'revision_requested' ? await conversationService.findInviteForQuotation(quotation.id) : null;
 
-  // The revision that replaced this one, if any — lets the UI link forward
-  // from a superseded ("revised") quotation to its newer version.
   const nextRevision = chain.find((entry) => entry.parent_quotation_id === quotation.id) || null;
 
   return {
@@ -311,6 +318,7 @@ async function getQuotationDetailForCustomer(customerId, quotationId) {
       : null,
     revisionNumber: quotation.revision_number,
     revisionNote: quotation.revision_note,
+    canRequestChanges: canRequestChanges(quotation),
     parentQuotationId: quotation.parent_quotation_id,
     revisedAt: quotation.revised_at,
     expiresAt: quotation.expires_at,
@@ -378,9 +386,6 @@ function timeToMinutes(timeString) {
   return hour * 60 + minute;
 }
 
-// Same-day ranges overlap when each starts before the other ends. Missing
-// start/end time on either side is treated as an all-day commitment, since
-// there's no safe way to assume no overlap without knowing the hours.
 function bookingsConflict(dateA, startA, endA, dateB, startB, endB) {
   if (dateA !== dateB) return false;
   const startAMin = timeToMinutes(startA);
@@ -393,12 +398,6 @@ function bookingsConflict(dateA, startA, endA, dateB, startB, endB) {
   return startAMin < endBMin && startBMin < endAMin;
 }
 
-// Backstop for the "already booked" calendar the customer sees when
-// requesting a quote — that only blocks whole days at the point of
-// submission, so this re-checks with real time-overlap precision at the
-// moment a booking is actually about to be created, in case another
-// acceptance took the slot in between (or the request predates that
-// calendar feature).
 async function assertVendorAvailable(vendorId, eventDate, startTime, endTime) {
   if (!eventDate) return;
   const existingSchedule = await bookingModel.findConfirmedScheduleByVendorId(vendorId);
@@ -423,18 +422,20 @@ async function acceptQuotation(customerId, quotationId) {
 
   await assertVendorAvailable(quotation.vendor_id, request.event_date, request.start_time, request.end_time);
 
-  const [updatedQuotation, , booking] = await Promise.all([
+  const booking = await bookingModel.createBooking({
+    quotation_id: quotationId,
+    vendor_id: quotation.vendor_id,
+    user_id: customerId,
+    booking_date: request.event_date,
+    start_time: request.start_time,
+    end_time: request.end_time,
+    status: 'confirmed',
+    deposit_due_at: computeExpiresAt(DEPOSIT_PAYMENT_HOURS),
+  });
+
+  const [updatedQuotation] = await Promise.all([
     quotationModel.updateStatus(quotationId, 'accepted'),
     quotationRequestModel.updateStatus(request.id, 'accepted'),
-    bookingModel.createBooking({
-      quotation_id: quotationId,
-      vendor_id: quotation.vendor_id,
-      user_id: customerId,
-      booking_date: request.event_date,
-      start_time: request.start_time,
-      end_time: request.end_time,
-      status: 'confirmed',
-    }),
   ]);
 
   const conversation = await conversationService.ensureConversationForBooking(booking);
@@ -442,9 +443,6 @@ async function acceptQuotation(customerId, quotationId) {
   return { id: updatedQuotation.id, status: updatedQuotation.status, conversationId: conversation.id };
 }
 
-// Customer asks the vendor for changes before accepting. Only a freshly sent
-// (still 'pending') quotation is eligible — once accepted a booking already
-// exists, and this flow is scoped to before payment/acceptance.
 async function requestRevision(customerId, quotationId, note) {
   const { quotation } = await loadOwnedQuotation(customerId, quotationId);
 
@@ -456,13 +454,14 @@ async function requestRevision(customerId, quotationId, note) {
     throw new AppError(409, 'This quotation has expired.');
   }
 
-  const updated = await quotationModel.markRevisionRequested(quotationId, note);
+  if (!canRequestChanges(quotation)) {
+    throw new AppError(409, 'You have already requested changes once. Please accept or decline this revised quotation.');
+  }
+
+  const updated = await quotationModel.markRevisionRequested(quotationId, note, computeExpiresAt(REVISION_EXPIRY_HOURS));
   return { id: updated.id, status: updated.status, revisionNote: updated.revision_note };
 }
 
-// Vendor sends a new quotation for the same request instead of overwriting
-// the old one — the old row is kept, marked 'revised', and linked via
-// parent_quotation_id so the full history stays intact.
 async function createRevisionForQuotation(userId, vendorIdHint, quotationId, payload) {
   const vendorId = await resolveVendorId(userId, vendorIdHint);
   if (!vendorId) {
@@ -478,8 +477,17 @@ async function createRevisionForQuotation(userId, vendorIdHint, quotationId, pay
     throw new AppError(409, 'This quotation is not awaiting a revision.');
   }
 
+  if (isExpired(oldQuotation)) {
+    await Promise.all([
+      quotationModel.updateStatus(oldQuotation.id, 'cancelled'),
+      quotationRequestModel.updateStatus(oldQuotation.quotation_request_id, 'declined'),
+    ]);
+    throw new AppError(409, 'The deadline to respond to this revision request has passed, and it was automatically declined.');
+  }
+
+  const originatingRequest = await quotationRequestModel.findById(oldQuotation.quotation_request_id);
   const validServiceIds = await loadValidServiceIds(vendorId);
-  const items = normalizeItems(payload.items, validServiceIds);
+  const items = attachRequestedService(normalizeItems(payload.items, validServiceIds), originatingRequest?.service_id);
   if (!items.length) {
     throw new AppError(400, 'Add at least one service with a name, quantity, and unit price.');
   }
@@ -500,7 +508,7 @@ async function createRevisionForQuotation(userId, vendorIdHint, quotationId, pay
     grand_total: grandTotal,
     service_message: payload.service_message ? String(payload.service_message).trim() : null,
     status: 'pending',
-    expires_at: computeExpiresAt(),
+    expires_at: computeExpiresAt(REVISION_EXPIRY_HOURS),
     parent_quotation_id: oldQuotation.id,
     revision_number: (oldQuotation.revision_number || 1) + 1,
   });
@@ -520,11 +528,6 @@ async function createRevisionForQuotation(userId, vendorIdHint, quotationId, pay
   };
 }
 
-// Vendor sends (or re-sends) a chat invite for a quotation the customer
-// asked to revise — lets the vendor ask a clarifying question before
-// committing to a full revision. Only available in that one narrow window;
-// the customer must accept before real messaging works (see
-// conversationService.sendMessage's status gate).
 async function createChatInviteForQuotation(userId, vendorIdHint, quotationId) {
   const vendorId = await resolveVendorId(userId, vendorIdHint);
   if (!vendorId) {
@@ -582,4 +585,5 @@ module.exports = {
   requestRevision,
   createRevisionForQuotation,
   createChatInviteForQuotation,
+  expireOverdueRevisionRequests,
 };

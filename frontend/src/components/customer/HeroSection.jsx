@@ -39,9 +39,6 @@ function CalendarIcon() {
   );
 }
 
-// Purely decorative — vendors are the static ones in the Figma mockup, not
-// live filters. The only real behavior is the button sending the customer
-// to Browse Vendors, where actual search/filtering already lives.
 const SEARCH_FIELDS = [
   { icon: TagIcon, label: 'Event Type', value: 'Select Category' },
   { icon: PinIcon, label: 'Location', value: 'Phnom Penh' },

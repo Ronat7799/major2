@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createYellowMarkerIcon, loadLeaflet } from '../../utils/loadLeaflet.js';
 import { buildShortAddress, reverseGeocode, searchPlaces } from '../../utils/nominatim.js';
 
-const DEFAULT_CENTER = [11.5564, 104.9282]; // Phnom Penh
+const DEFAULT_CENTER = [11.5564, 104.9282]; 
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
@@ -26,6 +26,7 @@ export default function LocationPicker({ value, onChange }) {
 
   useEffect(() => {
     let cancelled = false;
+    let resizeObserver;
 
     loadLeaflet()
       .then((L) => {
@@ -43,8 +44,10 @@ export default function LocationPicker({ value, onChange }) {
         mapInstanceRef.current = map;
         markerRef.current = marker;
 
-        // Always resolves both an address AND coordinates together, never one without the other,
-        // so the profile save can never see a half-selected location.
+        requestAnimationFrame(() => map.invalidateSize());
+        resizeObserver = new ResizeObserver(() => map.invalidateSize());
+        resizeObserver.observe(mapRef.current);
+
         async function applyPosition(lat, lng) {
           marker.setLatLng([lat, lng]);
 
@@ -79,12 +82,14 @@ export default function LocationPicker({ value, onChange }) {
 
     return () => {
       cancelled = true;
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleQueryChange(text) {

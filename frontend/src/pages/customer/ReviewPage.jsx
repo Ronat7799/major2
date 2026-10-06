@@ -130,8 +130,6 @@ export default function ReviewPage() {
     ASPECTS.reduce((acc, aspect) => ({ ...acc, [aspect]: 0 }), {})
   );
 
-  // Overall rating is derived from the aspect ratings, not set separately —
-  // it only appears once every aspect has been rated.
   const aspectValues = Object.values(aspectRatings);
   const allAspectsRated = aspectValues.every((value) => value > 0);
   const overallRatingRaw = allAspectsRated
@@ -175,13 +173,10 @@ export default function ReviewPage() {
     };
   }, [id]);
 
-  // Revoke the object URLs we created for photo previews so we don't leak
-  // memory as photos are added/removed or the page is left.
   useEffect(() => {
     return () => {
       photos.forEach((photo) => URL.revokeObjectURL(photo.image_url));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleAddPhotos(event) {
@@ -295,7 +290,6 @@ export default function ReviewPage() {
         onSubmit={handleSubmit}
         className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8"
       >
-        {/* Your Experience */}
         <div>
           <h2 className="text-base font-bold text-black">Your Experience</h2>
           <div className="mt-3 flex items-center gap-3">
@@ -319,7 +313,6 @@ export default function ReviewPage() {
           </div>
         </div>
 
-        {/* Rate Specific Aspects */}
         <div className="mt-8 border-t border-gray-100 pt-6">
           <h2 className="text-base font-bold text-black">Rate Specific Aspects</h2>
           <div className="mt-4 space-y-3.5">
@@ -338,7 +331,6 @@ export default function ReviewPage() {
           ) : null}
         </div>
 
-        {/* Overall Rating — derived from the aspects above, appears once all are rated */}
         {allAspectsRated ? (
           <div className="success-pop mt-8 border-t border-gray-100 pt-6 text-center">
             <h2 className="text-base font-bold text-black">Overall Rating</h2>
@@ -351,7 +343,6 @@ export default function ReviewPage() {
           </div>
         ) : null}
 
-        {/* Write Your Review */}
         <div className="mt-8 border-t border-gray-100 pt-6">
           <h2 className="text-base font-bold text-black">Write Your Review</h2>
           <div className="relative mt-3">
@@ -368,7 +359,6 @@ export default function ReviewPage() {
           </div>
         </div>
 
-        {/* Upload Event Photos */}
         <div className="mt-8 border-t border-gray-100 pt-6">
           <h2 className="text-base font-bold text-black">Upload Event Photos</h2>
           <div className="mt-3 flex flex-wrap gap-3">
@@ -403,7 +393,6 @@ export default function ReviewPage() {
           <ImageLightbox images={photos} index={lightboxIndex} onClose={() => setLightboxIndex(null)} onNavigate={setLightboxIndex} />
         </div>
 
-        {/* Recommend */}
         <div className="mt-8 border-t border-gray-100 pt-6">
           <h2 className="text-base font-bold text-black">Would you recommend this vendor?</h2>
           <div className="mt-3 flex gap-3">
@@ -428,7 +417,6 @@ export default function ReviewPage() {
           </div>
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={submitting}

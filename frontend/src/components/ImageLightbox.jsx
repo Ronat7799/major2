@@ -18,9 +18,6 @@ function ChevronIcon({ direction }) {
   );
 }
 
-// Full-screen viewer for a set of images. `index` is the position within
-// `images` currently shown; the caller owns that state so it can also drive
-// which thumbnail looks "active" elsewhere on the page.
 export default function ImageLightbox({ images, index, onClose, onNavigate }) {
   const isOpen = index !== null && index !== undefined;
 
@@ -55,10 +52,6 @@ export default function ImageLightbox({ images, index, onClose, onNavigate }) {
 
   const image = images[index];
 
-  // Portalled to <body> so this fixed-position overlay is positioned
-  // against the real viewport, not against whatever ancestor happens to
-  // have a CSS transform/animation running (e.g. the page's fade-in),
-  // which would otherwise silently turn `fixed` into `absolute`.
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm sm:p-8"

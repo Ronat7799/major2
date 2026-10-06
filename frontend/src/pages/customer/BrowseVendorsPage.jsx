@@ -155,7 +155,6 @@ export default function BrowseVendorsPage() {
 
     const timeoutId = setTimeout(loadVendors, 300);
     return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   useEffect(() => {
@@ -173,7 +172,6 @@ export default function BrowseVendorsPage() {
         }
       })
       .catch(() => {
-        // Favorite state is a nice-to-have; leave hearts unfilled on failure.
       });
 
     return () => {
@@ -230,7 +228,6 @@ export default function BrowseVendorsPage() {
         await api.post('/saved-services', { service_id: serviceId });
       }
     } catch {
-      // Revert the optimistic update if the request failed.
       setSavedServiceIds((current) => {
         const next = new Set(current);
         if (alreadySaved) {
@@ -353,12 +350,6 @@ export default function BrowseVendorsPage() {
             <div
               ref={gridRef}
               className={`mt-6 flex flex-wrap gap-6 ${
-                // Centering only reads as intentional when the partial row is the
-                // page's *only* row (2 items, nothing above it). The moment a full
-                // row of 3 (the desktop column count) precedes it, centering the
-                // leftover items makes them drift out of alignment with the
-                // columns above — so anything else (1 lone item, or 3+ where a
-                // trailing partial row would misalign) stays left-aligned instead.
                 vendors.length === 2 ? 'justify-center' : 'justify-start'
               }`}
             >

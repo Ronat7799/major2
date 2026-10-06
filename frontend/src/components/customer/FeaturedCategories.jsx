@@ -2,7 +2,7 @@ import { useReveal, revealStyle } from '../../hooks/useReveal.js';
 
 function WeddingIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-6 w-6" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="h-9 w-9" fill="none" aria-hidden="true">
       <circle cx="7" cy="11" r="4" stroke="currentColor" strokeWidth="1.4" />
       <circle cx="13" cy="11" r="4" stroke="currentColor" strokeWidth="1.4" />
     </svg>
@@ -11,7 +11,7 @@ function WeddingIcon() {
 
 function BirthdayIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-6 w-6" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="h-9 w-9" fill="none" aria-hidden="true">
       <rect x="3" y="8.5" width="14" height="8" rx="1" stroke="currentColor" strokeWidth="1.4" />
       <path d="M3 11.5h14" stroke="currentColor" strokeWidth="1.4" />
       <path d="M10 8.5v8" stroke="currentColor" strokeWidth="1.4" />
@@ -27,7 +27,7 @@ function BirthdayIcon() {
 
 function CorporateIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-6 w-6" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="h-9 w-9" fill="none" aria-hidden="true">
       <rect x="3" y="7" width="14" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
       <path d="M7 7V5.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7" stroke="currentColor" strokeWidth="1.4" />
       <path d="M3 11h14" stroke="currentColor" strokeWidth="1.4" />
@@ -37,7 +37,7 @@ function CorporateIcon() {
 
 function GraduationIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-6 w-6" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="h-9 w-9" fill="none" aria-hidden="true">
       <path d="M10 4 2.5 7.5 10 11l7.5-3.5L10 4Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
       <path
         d="M5.5 9.3v3c0 1.1 2 2 4.5 2s4.5-.9 4.5-2v-3"
@@ -52,7 +52,7 @@ function GraduationIcon() {
 
 function FuneralIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-6 w-6" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="h-9 w-9" fill="none" aria-hidden="true">
       <circle cx="10" cy="10" r="2" stroke="currentColor" strokeWidth="1.4" />
       <circle cx="10" cy="5.3" r="2" stroke="currentColor" strokeWidth="1.2" />
       <circle cx="14.7" cy="10" r="2" stroke="currentColor" strokeWidth="1.2" />
@@ -64,7 +64,7 @@ function FuneralIcon() {
 
 function OtherIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-6 w-6" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="h-9 w-9" fill="none" aria-hidden="true">
       <path
         d="m10 3 1.9 4.1 4.4.5-3.3 3 1 4.4L10 12.8 6 15l1-4.4-3.3-3 4.4-.5L10 3Z"
         stroke="currentColor"
@@ -101,7 +101,7 @@ export default function FeaturedCategories() {
               style={revealStyle(visible, 300 + index * 120)}
               className="group flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#F5C400]/10 text-[#F5C400] transition-transform duration-200 group-hover:scale-110">
+              <div className="flex h-16 w-16 items-center justify-center text-[#F5C400] transition-transform duration-200 group-hover:scale-110">
                 <Icon />
               </div>
               <p className="text-sm font-semibold text-black">{category.label}</p>

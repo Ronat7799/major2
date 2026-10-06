@@ -49,9 +49,6 @@ async function findLatestForConversations(conversation_ids) {
   return data;
 }
 
-// Best-effort: the read_at column only exists once the read-tracking migration
-// has been applied, so a missing column degrades to "no unread counts" instead
-// of breaking the conversation list.
 async function countUnreadForConversations(conversation_ids, user_id) {
   if (!conversation_ids.length) {
     return [];
@@ -71,10 +68,6 @@ async function countUnreadForConversations(conversation_ids, user_id) {
   return data;
 }
 
-// Most recent messages NOT sent by excludeUserId across a set of
-// conversations — used by the vendor dashboard's Recent Activity feed to
-// surface "customer sent you a message" without pulling every message ever
-// sent.
 async function findRecentFromOthers(conversation_ids, excludeUserId, limit = 10) {
   if (!conversation_ids.length) {
     return [];

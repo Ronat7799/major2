@@ -1,7 +1,3 @@
--- Reabjom — initial PostgreSQL schema (Supabase)
--- One request = one customer + one vendor
--- Vendor quotes or declines; customer accept creates booking + conversation
--- Chat unlocks on accept, before payment
 
 create extension if not exists pgcrypto;
 
@@ -15,9 +11,6 @@ begin
 end;
 $$;
 
--- ---------------------------------------------------------------------------
--- users
--- ---------------------------------------------------------------------------
 create table public.users (
   id uuid primary key default gen_random_uuid(),
   full_name text not null,
@@ -38,9 +31,6 @@ create trigger users_set_updated_at
 before update on public.users
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- vendors (exactly one profile per vendor user)
--- ---------------------------------------------------------------------------
 create table public.vendors (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,
@@ -66,9 +56,6 @@ create trigger vendors_set_updated_at
 before update on public.vendors
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- services
--- ---------------------------------------------------------------------------
 create table public.services (
   id uuid primary key default gen_random_uuid(),
   vendor_id uuid not null,
@@ -93,9 +80,6 @@ create trigger services_set_updated_at
 before update on public.services
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- portfolio (images belong to a service)
--- ---------------------------------------------------------------------------
 create table public.portfolio (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null,
@@ -111,9 +95,6 @@ create trigger portfolio_set_updated_at
 before update on public.portfolio
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- quotation_requests (one customer → one vendor per row)
--- ---------------------------------------------------------------------------
 create table public.quotation_requests (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null,
@@ -159,7 +140,6 @@ create index quotation_requests_vendor_id_idx on public.quotation_requests (vend
 create index quotation_requests_status_idx on public.quotation_requests (status);
 create index quotation_requests_event_date_idx on public.quotation_requests (event_date);
 
--- At most one open request (pending or quoted) per customer + vendor
 create unique index quotation_requests_one_open_per_vendor_idx
   on public.quotation_requests (customer_id, vendor_id)
   where status in ('pending', 'quoted');
@@ -168,9 +148,6 @@ create trigger quotation_requests_set_updated_at
 before update on public.quotation_requests
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- quotation_requests_services (categories on the request, not a service FK)
--- ---------------------------------------------------------------------------
 create table public.quotation_requests_services (
   id uuid primary key default gen_random_uuid(),
   quotation_request_id uuid not null,
@@ -182,9 +159,6 @@ create table public.quotation_requests_services (
 create index quotation_requests_services_request_idx
   on public.quotation_requests_services (quotation_request_id);
 
--- ---------------------------------------------------------------------------
--- quotation_requests_image
--- ---------------------------------------------------------------------------
 create table public.quotation_requests_image (
   id uuid primary key default gen_random_uuid(),
   quotation_request_id uuid not null,
@@ -197,9 +171,6 @@ create table public.quotation_requests_image (
 create index quotation_requests_image_request_idx
   on public.quotation_requests_image (quotation_request_id);
 
--- ---------------------------------------------------------------------------
--- quotation (at most one per request; created only if vendor quotes)
--- ---------------------------------------------------------------------------
 create table public.quotation (
   id uuid primary key default gen_random_uuid(),
   quotation_request_id uuid not null,
@@ -231,9 +202,6 @@ create trigger quotation_set_updated_at
 before update on public.quotation
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- quotation_items (price snapshot; not live service rows)
--- ---------------------------------------------------------------------------
 create table public.quotation_items (
   id uuid primary key default gen_random_uuid(),
   quotation_id uuid not null,
@@ -251,9 +219,6 @@ create table public.quotation_items (
 
 create index quotation_items_quotation_id_idx on public.quotation_items (quotation_id);
 
--- ---------------------------------------------------------------------------
--- quotation_additional_charges
--- ---------------------------------------------------------------------------
 create table public.quotation_additional_charges (
   id uuid primary key default gen_random_uuid(),
   quotation_id uuid not null,
@@ -267,9 +232,6 @@ create table public.quotation_additional_charges (
 create index quotation_additional_charges_quotation_id_idx
   on public.quotation_additional_charges (quotation_id);
 
--- ---------------------------------------------------------------------------
--- bookings (created when customer accepts the quotation)
--- ---------------------------------------------------------------------------
 create table public.bookings (
   id uuid primary key default gen_random_uuid(),
   quotation_id uuid not null,
@@ -303,9 +265,6 @@ create trigger bookings_set_updated_at
 before update on public.bookings
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- payments (after chat is already allowed)
--- ---------------------------------------------------------------------------
 create table public.payments (
   id uuid primary key default gen_random_uuid(),
   booking_id uuid not null,
@@ -332,9 +291,6 @@ create trigger payments_set_updated_at
 before update on public.payments
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- conversations (one per booking; created on quote accept)
--- ---------------------------------------------------------------------------
 create table public.conversations (
   id uuid primary key default gen_random_uuid(),
   booking_id uuid not null,
@@ -358,9 +314,6 @@ create trigger conversations_set_updated_at
 before update on public.conversations
 for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------------------
--- messages (sender is always users.id — vendor uses their user account)
--- ---------------------------------------------------------------------------
 create table public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null,
@@ -380,9 +333,6 @@ create index messages_conversation_id_idx on public.messages (conversation_id);
 create index messages_user_id_idx on public.messages (user_id);
 create index messages_created_at_idx on public.messages (conversation_id, created_at);
 
--- ---------------------------------------------------------------------------
--- reviews (one per booking; only completed bookings in application logic)
--- ---------------------------------------------------------------------------
 create table public.reviews (
   id uuid primary key default gen_random_uuid(),
   booking_id uuid not null,

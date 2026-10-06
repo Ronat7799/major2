@@ -1,7 +1,3 @@
--- ---------------------------------------------------------------------------
--- saved_services (customer favorites/bookmarks on a specific vendor service —
--- Browse Vendors lists one card per service, so favoriting is per-service)
--- ---------------------------------------------------------------------------
 create table public.saved_services (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,

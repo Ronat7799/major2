@@ -145,11 +145,16 @@ function formatMoney(value) {
   return `$${(Number(value) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function pad(value) {
+  return String(value).padStart(2, '0');
+}
+
 const STATUS_STYLES = {
   'Pending Payment': 'bg-amber-50 text-amber-600',
   Confirmed: 'bg-blue-50 text-blue-600',
   Completed: 'bg-green-50 text-green-600',
   Cancelled: 'bg-red-50 text-red-600',
+  Declined: 'bg-orange-50 text-orange-600',
 };
 
 function DetailField({ icon, label, value }) {
@@ -171,6 +176,12 @@ export default function BookingDetailPage() {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,6 +232,24 @@ export default function BookingDetailPage() {
     );
   }
 
+  const isBookingOpen = booking.status !== 'Cancelled' && booking.status !== 'Declined';
+
+  let depositCountdownLabel = null;
+  let depositCountdownStyle = 'text-black/55';
+  const depositAwaitingPayment = isBookingOpen && booking.payment && !booking.payment.deposit.paid;
+  if (depositAwaitingPayment && booking.depositDueAt) {
+    const diffMs = new Date(booking.depositDueAt).getTime() - nowTick;
+    if (diffMs > 0) {
+      const totalMinutes = Math.floor(diffMs / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      depositCountdownLabel = `Pay deposit within ${hours}h ${pad(minutes)}m`;
+      if (hours >= 12) depositCountdownStyle = 'text-black/55';
+      else if (hours >= 4) depositCountdownStyle = 'text-orange-600';
+      else depositCountdownStyle = 'text-red-600';
+    }
+  }
+
   return (
     <div className="page-fade-in mx-auto max-w-6xl px-6 py-10">
       <div className="flex items-center gap-2 text-sm text-black/45">
@@ -244,10 +273,24 @@ export default function BookingDetailPage() {
         <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${STATUS_STYLES[booking.status] || STATUS_STYLES.Confirmed}`}>
           {booking.status}
         </span>
+        {depositCountdownLabel ? (
+          <span className={`flex items-center gap-1.5 text-sm font-semibold ${depositCountdownStyle}`}>
+            <ClockIcon />
+            {depositCountdownLabel}
+          </span>
+        ) : null}
       </div>
 
+      {(booking.status === 'Cancelled' || booking.status === 'Declined') && booking.cancellationReason ? (
+        <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-600/70">
+            {booking.status === 'Declined' ? 'Decline Reason' : 'Cancellation Reason'}
+          </p>
+          <p className="mt-1 text-sm text-red-700">{booking.cancellationReason}</p>
+        </div>
+      ) : null}
+
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left column */}
         <div className="space-y-6 lg:col-span-2">
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="ui-yellow-text text-base font-bold">Event Summary</h2>
@@ -334,7 +377,7 @@ export default function BookingDetailPage() {
                 </div>
               </div>
 
-              {!booking.payment.deposit.paid ? (
+              {isBookingOpen && !booking.payment.deposit.paid ? (
                 <button
                   type="button"
                   onClick={() => navigate(`/customer/quotations/${booking.quotationId}/payment?stage=deposit`)}
@@ -342,7 +385,7 @@ export default function BookingDetailPage() {
                 >
                   Pay Deposit
                 </button>
-              ) : !booking.payment.balance.paid ? (
+              ) : isBookingOpen && !booking.payment.balance.paid ? (
                 <button
                   type="button"
                   onClick={() => navigate(`/customer/quotations/${booking.quotationId}/payment?stage=balance`)}
@@ -355,7 +398,6 @@ export default function BookingDetailPage() {
           ) : null}
         </div>
 
-        {/* Right column */}
         <div className="space-y-6">
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="text-base font-bold text-black">Your Vendor</h2>

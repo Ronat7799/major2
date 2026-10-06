@@ -2,19 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
 import { getErrorMessage } from '../../utils/apiError.js';
-
-function StarIcon({ filled }) {
-  return (
-    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill={filled ? 'currentColor' : 'none'} aria-hidden="true">
-      <path
-        d="M10 2.5l2.2 4.6 5 .7-3.6 3.6.9 5-4.5-2.4-4.5 2.4.9-5-3.6-3.6 5-.7L10 2.5Z"
-        stroke="currentColor"
-        strokeWidth={filled ? 0 : 1.3}
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+import VendorRating from '../../components/customer/VendorRating.jsx';
 
 function ClockIcon() {
   return (
@@ -163,8 +151,6 @@ export default function MyQuotationsPage() {
     }
   }
 
-  // expiresAt/isExpired come straight from the backend now (real, enforced
-  // server-side) — nowTick just keeps the countdown text ticking down live.
   const enriched = useMemo(
     () =>
       quotations
@@ -197,9 +183,6 @@ export default function MyQuotationsPage() {
     [quotations, nowTick]
   );
 
-  // Not-yet-quoted requests only show under "All" — they're a different kind
-  // of card (no price, no navigation) and don't map cleanly onto the
-  // Pending/Accepted/Declined/Expired filters, which are about quotations.
   const unquotedItems = quotations.filter((quotation) => !quotation.hasQuotation);
 
   const filtered = enriched.filter((quotation) => {
@@ -223,7 +206,7 @@ export default function MyQuotationsPage() {
   }
 
   return (
-    <div className="page-fade-in mx-auto max-w-6xl px-6 py-10">
+    <div className="page-fade-in mx-auto max-w-[1600px] px-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="ui-yellow-text text-3xl font-extrabold tracking-tight sm:text-4xl">My Quotations</h1>
@@ -358,7 +341,10 @@ export default function MyQuotationsPage() {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-base font-bold text-black">{quotation.vendorName}</p>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate text-base font-bold text-black">{quotation.vendorName}</p>
+                      <VendorRating average={quotation.ratingAverage} />
+                    </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       {quotation.eventCategory ? (
                         <span className="ui-yellow rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-black">
@@ -370,43 +356,28 @@ export default function MyQuotationsPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 border-t border-gray-100 pt-4">
-                  <p className="text-2xl font-extrabold text-green-600">
-                    ${Number(quotation.grandTotal).toLocaleString('en-US')}
-                  </p>
-                  <p className="text-xs font-medium text-black/45">Total Package</p>
-                </div>
+                <div className="mt-4 flex items-end justify-between gap-3 border-t border-gray-100 pt-4">
+                  <div>
+                    <p className="text-2xl font-extrabold text-green-600">
+                      ${Number(quotation.grandTotal).toLocaleString('en-US')}
+                    </p>
+                    <p className="text-xs font-medium text-black/45">Total Package</p>
+                  </div>
 
-                <div className="mt-3 flex items-center gap-1.5">
-                  {quotation.ratingAverage !== null ? (
-                    <>
-                      <span className="flex items-center gap-0.5 text-[#F5C400]">
-                        {Array.from({ length: 5 }, (_, index) => (
-                          <StarIcon key={index} filled={index < Math.round(quotation.ratingAverage)} />
-                        ))}
-                      </span>
-                      <span className="text-sm font-bold text-black">{quotation.ratingAverage.toFixed(1)}</span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-black/40">No reviews yet</span>
-                  )}
-                </div>
-
-                {quotation.statusLabel === 'Pending' ? (
-                  <div className="mt-4">
-                    {quotation.expired ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-500">
+                  {quotation.statusLabel === 'Pending' ? (
+                    quotation.expired ? (
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-500">
                         <ClockIcon /> Expired
                       </span>
                     ) : (
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${quotation.countdownStyle}`}
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${quotation.countdownStyle}`}
                       >
                         <ClockIcon /> {quotation.countdownLabel}
                       </span>
-                    )}
-                  </div>
-                ) : null}
+                    )
+                  ) : null}
+                </div>
               </div>
             )
           )}

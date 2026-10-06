@@ -38,8 +38,6 @@ function toServiceFields(payload) {
 
 const MAX_SERVICE_IMAGES = 12;
 
-// vendorIdHint comes from the JWT (set at login/register) so most requests skip
-// this lookup entirely; only tokens issued before that change fall back to a query.
 async function resolveVendorId(userId, vendorIdHint) {
   if (vendorIdHint) {
     return vendorIdHint;
@@ -131,8 +129,6 @@ async function listMyServices(userId, vendorIdHint, filters = {}) {
 }
 
 async function getMyServiceById(userId, vendorIdHint, serviceId) {
-  // These three lookups are independent of each other, so run them together
-  // instead of paying for three round trips end-to-end.
   const [vendorId, service, images] = await Promise.all([
     resolveVendorId(userId, vendorIdHint),
     serviceModel.findById(serviceId),
@@ -181,7 +177,6 @@ async function updateMyService(userId, vendorIdHint, serviceId, payload, files =
     try {
       await storageService.removeServiceImages(imagesToRemove.map((image) => image.image_url));
     } catch (error) {
-      // Rows are already gone; leftover storage files are not fatal.
     }
   }
 
@@ -212,13 +207,10 @@ async function deleteMyService(userId, vendorIdHint, serviceId) {
     try {
       await storageService.removeServiceImages(images.map((image) => image.image_url));
     } catch (error) {
-      // Service row is already gone; leftover storage files are not fatal.
     }
   }
 }
 
-// Lightweight list for the Create Quotation page's "link to one of your
-// services" picker — active services only, no pagination/images overhead.
 async function listMyServiceOptions(userId, vendorIdHint) {
   const vendorId = await resolveVendorId(userId, vendorIdHint);
   if (!vendorId) {
@@ -244,15 +236,9 @@ function getTopServicesPeriodStart(period, now) {
     start.setHours(0, 0, 0, 0);
     return start;
   }
-  // 'month' — calendar month to date, matching the "This Month" label.
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
-// Ranks a vendor's own services by bookings/revenue within a period. A
-// booking's items only carry a service_id when the vendor picked one of
-// their own services while quoting (see quotation_items.service_id) — a
-// custom/free-text line item has no service_id and is excluded, since it
-// isn't attributable to any one catalog service.
 async function getTopServicesForVendor(vendorId, period) {
   const safePeriod = TOP_SERVICES_PERIODS.includes(period) ? period : 'month';
   const periodStart = getTopServicesPeriodStart(safePeriod, new Date());
@@ -280,9 +266,6 @@ async function getTopServicesForVendor(vendorId, period) {
     }
   }
 
-  // Every service is shown, including ones with zero bookings this period —
-  // not just the ones with activity — so a vendor can see their whole
-  // catalog's standing at a glance, not a list that shrinks to nothing.
   return services
     .map((service) => {
       const stat = statsByServiceId.get(service.id);

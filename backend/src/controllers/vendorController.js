@@ -58,7 +58,9 @@ async function getMyUpcomingEvents(req, res, next) {
 
 async function getMyAttentionSummary(req, res, next) {
   try {
-    const attention = await vendorService.getMyAttentionSummary(req.auth.sub);
+    const attention = await vendorService.getMyAttentionSummary(req.auth.sub, {
+      bookingsSeenSince: req.query.bookingsSeenSince,
+    });
     return success(res, 200, 'Attention summary retrieved.', { attention });
   } catch (error) {
     return next(error);

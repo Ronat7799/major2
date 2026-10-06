@@ -54,9 +54,9 @@ export default function RegisterChoicePage() {
 
   return (
     <AuthModal maxWidthClassName="max-w-5xl" brandPanel brandImage={registerPanelImage}>
-      <p className="ui-yellow-text text-sm font-bold tracking-tight">Reab Jom</p>
+      <p className="ui-yellow-text text-sm font-bold tracking-tight">ReabJom</p>
       <h1 className="mt-2 text-2xl font-extrabold text-black sm:text-3xl">Create Your Account</h1>
-      <p className="mt-1.5 text-sm text-black/55">Choose how you&apos;d like to use Reabjom.</p>
+      <p className="mt-1.5 text-sm text-black/55">Choose how you&apos;d like to use ReabJom.</p>
 
       <div className="mt-6 grid items-stretch gap-4 sm:grid-cols-2">
         <div className="flex flex-col rounded-2xl border border-gray-200 p-6 transition-shadow duration-200 hover:shadow-lg">

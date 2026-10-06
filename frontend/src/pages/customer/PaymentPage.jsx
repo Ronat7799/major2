@@ -54,19 +54,87 @@ function PinIcon() {
   );
 }
 
-function GuestsIcon() {
+function VisaBadge() {
+  return <span className="rounded bg-[#1A1F71] px-2 py-1 text-[10px] font-extrabold italic text-white">VISA</span>;
+}
+
+function MastercardBadge() {
   return (
-    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-      <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M2.5 16c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="14" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M12.5 12.2c2 .2 3.5 1.6 3.5 3.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    <span className="flex items-center rounded bg-white px-1.5 py-1">
+      <span className="h-3.5 w-3.5 rounded-full bg-[#EB001B]" />
+      <span className="-ml-1.5 h-3.5 w-3.5 rounded-full bg-[#F79E1B] mix-blend-multiply" />
+    </span>
+  );
+}
+
+function AmexBadge() {
+  return <span className="rounded bg-[#2E77BC] px-2 py-1 text-[10px] font-extrabold text-white">AMEX</span>;
+}
+
+function DemoBadge() {
+  return (
+    <span className="rounded bg-gray-100 px-2 py-1 text-[10px] font-extrabold tracking-wide text-black/50">DEMO</span>
+  );
+}
+
+function CardIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4 text-black/30" fill="none" aria-hidden="true">
+      <rect x="2.5" y="4.5" width="15" height="11" rx="1.4" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M2.5 8h15" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   );
 }
 
-function StripeMark() {
-  return <span className="rounded-md bg-[#635BFF] px-2.5 py-1 text-xs font-bold italic text-white">stripe</span>;
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+      <path
+        d="M10 2.5 16 5v4.3c0 4-2.6 6.9-6 8.2-3.4-1.3-6-4.2-6-8.2V5l6-2.5Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PaymentMethodOption({ selected, onClick, label, badges }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-colors ${
+        selected ? 'border-[#F5C400] bg-[#F5C400]/10' : 'border-gray-200 bg-white hover:border-gray-300'
+      }`}
+    >
+      <span className="flex items-center gap-3">
+        <span
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+            selected ? 'border-[#F5C400]' : 'border-gray-300'
+          }`}
+        >
+          {selected ? <span className="h-2.5 w-2.5 rounded-full bg-[#F5C400]" /> : null}
+        </span>
+        <span className="text-sm font-bold text-black">{label}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5">{badges}</span>
+    </button>
+  );
+}
+
+function formatCardNumberInput(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 19);
+  return (digits.match(/.{1,4}/g) || []).join(' ');
+}
+
+function formatExpiryInput(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  return digits.length <= 2 ? digits : `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+function formatCvcInput(value) {
+  return value.replace(/\D/g, '').slice(0, 4);
 }
 
 function initialsOf(name) {
@@ -99,16 +167,6 @@ function formatTimeRange(startTime, endTime) {
   const end = formatTime(endTime);
   if (start && end) return `${start} - ${end}`;
   return start || end || 'Not specified';
-}
-
-function formatRange(min, max, prefix = '') {
-  const hasMin = min !== null && min !== undefined;
-  const hasMax = max !== null && max !== undefined;
-  if (!hasMin && !hasMax) return 'Not specified';
-  if (hasMin && hasMax && Number(min) !== Number(max)) {
-    return `${prefix}${Number(min).toLocaleString('en-US')} - ${prefix}${Number(max).toLocaleString('en-US')}`;
-  }
-  return `${prefix}${Number(hasMin ? min : max).toLocaleString('en-US')}`;
 }
 
 function formatMoney(value) {
@@ -151,9 +209,6 @@ const CARD_ELEMENT_OPTIONS = {
   },
 };
 
-// Lives inside <Elements> so it can use the Stripe hooks — collects the
-// cardholder name/ZIP alongside Stripe's own Card Element and confirms the
-// Payment Intent the parent already created.
 function StripeCardForm({ quotationId, stage, clientSecret, cardholderName, setCardholderName, zip, setZip }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -194,33 +249,33 @@ function StripeCardForm({ quotationId, stage, clientSecret, cardholderName, setC
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h2 className="text-base font-bold text-black">Complete Your Payment Method</h2>
-      <p className="mt-1 text-sm text-black/45">Enter your card details below to pay for this booking.</p>
+    <form onSubmit={handleSubmit}>
+      <div className="space-y-4">
+        <Field label="Card Number">
+          <div
+            className={`flex items-center justify-between rounded-lg border bg-white px-3 py-3 transition-shadow ${
+              cardFocused ? 'border-[#F5C400] shadow-[0_0_0_3px_rgba(245,196,0,0.35)]' : 'border-gray-200'
+            }`}
+          >
+            <div className="w-full">
+              <CardElement
+                options={CARD_ELEMENT_OPTIONS}
+                onFocus={() => setCardFocused(true)}
+                onBlur={() => setCardFocused(false)}
+              />
+            </div>
+            <CardIcon />
+          </div>
+        </Field>
 
-      <div className="mt-5 space-y-4 border-t border-gray-100 pt-5">
         <Field label="Cardholder Name">
           <input
             type="text"
             value={cardholderName}
             onChange={(event) => setCardholderName(event.target.value)}
-            placeholder="Name on card"
+            placeholder="Full name on card"
             className={inputClass}
           />
-        </Field>
-
-        <Field label="Card Details">
-          <div
-            className={`rounded-lg border bg-white px-3 py-3 transition-shadow ${
-              cardFocused ? 'border-[#F5C400] shadow-[0_0_0_3px_rgba(245,196,0,0.35)]' : 'border-gray-200'
-            }`}
-          >
-            <CardElement
-              options={CARD_ELEMENT_OPTIONS}
-              onFocus={() => setCardFocused(true)}
-              onBlur={() => setCardFocused(false)}
-            />
-          </div>
         </Field>
 
         <Field label="Billing ZIP / Postal Code">
@@ -240,18 +295,147 @@ function StripeCardForm({ quotationId, stage, clientSecret, cardholderName, setC
         </p>
       ) : null}
 
+      <div className="mt-5 flex items-center gap-5 border-t border-gray-100 pt-5 text-xs text-black/40">
+        <span className="flex items-center gap-1.5">
+          <ShieldIcon /> SSL Encrypted Payment
+        </span>
+        <span className="flex items-center gap-1.5">
+          <ShieldIcon /> 256-bit Security
+        </span>
+      </div>
+
       <button
         type="submit"
         disabled={!stripe || paying}
-        className="ui-yellow ui-yellow-hover mt-6 w-full rounded-full py-3.5 text-sm font-bold text-black shadow-sm transition-all hover:scale-[1.01] active:scale-100 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+        className="ui-yellow ui-yellow-hover mt-5 w-full rounded-xl py-3.5 text-sm font-bold text-black shadow-sm transition-all hover:scale-[1.01] active:scale-100 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
       >
         {paying ? 'Processing…' : 'Pay Now'}
       </button>
 
-      <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-black/40">
-        Secured by <StripeMark />
+      <p className="mt-3 text-center text-xs text-black/40">
+        By completing payment you agree to our Terms of Service and Cancellation Policy.
       </p>
-      <p className="mt-2 text-center text-xs text-black/40">
+    </form>
+  );
+}
+
+function SimulatedPaymentForm({ bookingId, quotationId, stage }) {
+  const navigate = useNavigate();
+  const [cardholderName, setCardholderName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvc, setCvc] = useState('');
+  const [zip, setZip] = useState('');
+  const [cardFocused, setCardFocused] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState('');
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setPayError('');
+    setPaying(true);
+    try {
+      await api.post(`/bookings/${bookingId}/simulate-${stage}`, { cardNumber, expiry, cvc, zip });
+      navigate(`/customer/quotations/${quotationId}/payment/success?stage=${stage}`);
+    } catch (err) {
+      setPayError(getErrorMessage(err, 'Simulated payment failed. Please check the card details and try again.'));
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="space-y-4">
+        <Field label="Card Details">
+          <div
+            className={`flex items-center rounded-lg border bg-white px-3 py-2.5 transition-shadow ${
+              cardFocused ? 'border-[#F5C400] shadow-[0_0_0_3px_rgba(245,196,0,0.35)]' : 'border-gray-200'
+            }`}
+          >
+            <input
+              type="text"
+              inputMode="numeric"
+              value={cardNumber}
+              onChange={(event) => setCardNumber(formatCardNumberInput(event.target.value))}
+              onFocus={() => setCardFocused(true)}
+              onBlur={() => setCardFocused(false)}
+              placeholder="1234 5678 9012 3456"
+              className="w-full min-w-0 flex-1 border-none p-0 text-sm text-black outline-none placeholder:text-black/30"
+            />
+            <span className="mx-2.5 h-5 w-px shrink-0 bg-gray-200" />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={expiry}
+              onChange={(event) => setExpiry(formatExpiryInput(event.target.value))}
+              onFocus={() => setCardFocused(true)}
+              onBlur={() => setCardFocused(false)}
+              placeholder="MM/YY"
+              className="w-14 shrink-0 border-none p-0 text-sm text-black outline-none placeholder:text-black/30"
+            />
+            <span className="mx-2.5 h-5 w-px shrink-0 bg-gray-200" />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={cvc}
+              onChange={(event) => setCvc(formatCvcInput(event.target.value))}
+              onFocus={() => setCardFocused(true)}
+              onBlur={() => setCardFocused(false)}
+              placeholder="CVC"
+              className="w-10 shrink-0 border-none p-0 text-sm text-black outline-none placeholder:text-black/30"
+            />
+            <span className="ml-2.5 shrink-0">
+              <CardIcon />
+            </span>
+          </div>
+        </Field>
+
+        <Field label="Cardholder Name">
+          <input
+            type="text"
+            value={cardholderName}
+            onChange={(event) => setCardholderName(event.target.value)}
+            placeholder="Full name on card"
+            className={inputClass}
+          />
+        </Field>
+
+        <Field label="Billing ZIP / Postal Code">
+          <input
+            type="text"
+            value={zip}
+            onChange={(event) => setZip(event.target.value)}
+            placeholder="12000"
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      {payError ? (
+        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
+          {payError}
+        </p>
+      ) : null}
+
+      <div className="mt-5 flex items-center gap-5 border-t border-gray-100 pt-5 text-xs text-black/40">
+        <span className="flex items-center gap-1.5">
+          <ShieldIcon /> SSL Encrypted Payment
+        </span>
+        <span className="flex items-center gap-1.5">
+          <ShieldIcon /> 256-bit Security
+        </span>
+      </div>
+
+      <button
+        type="submit"
+        disabled={paying}
+        className="ui-yellow ui-yellow-hover mt-5 w-full rounded-xl py-3.5 text-sm font-bold text-black shadow-sm transition-all hover:scale-[1.01] active:scale-100 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+      >
+        {paying ? 'Processing…' : 'Pay Now'}
+      </button>
+
+      <p className="mt-3 text-center text-xs text-black/40">
         By completing payment you agree to our Terms of Service and Cancellation Policy.
       </p>
     </form>
@@ -275,6 +459,7 @@ export default function PaymentPage() {
 
   const [cardholderName, setCardholderName] = useState('');
   const [zip, setZip] = useState('');
+  const [payMode, setPayMode] = useState('stripe');
 
   useEffect(() => {
     let cancelled = false;
@@ -356,6 +541,7 @@ export default function PaymentPage() {
   }
 
   const itemsSubtotal = quotation.items.reduce((sum, item) => sum + Number(item.totalPrice), 0);
+  const chargesSubtotal = quotation.charges.reduce((sum, charge) => sum + Number(charge.chargePrice), 0);
 
   return (
     <div className="page-fade-in mx-auto max-w-6xl px-6 py-10">
@@ -378,41 +564,63 @@ export default function PaymentPage() {
       <h1 className="mt-3 text-2xl font-extrabold text-black sm:text-[28px]">Payment</h1>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left column — Stripe payment form */}
         <div className="lg:col-span-2">
-          {clientSecret ? (
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <StripeCardForm
-                quotationId={id}
-                stage={stage}
-                clientSecret={clientSecret}
-                cardholderName={cardholderName}
-                setCardholderName={setCardholderName}
-                zip={zip}
-                setZip={setZip}
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-bold text-black">Payment Method</h2>
+
+            <div className="mt-4 space-y-3">
+              <PaymentMethodOption
+                selected={payMode === 'stripe'}
+                onClick={() => setPayMode('stripe')}
+                label="Credit / Debit Card"
+                badges={
+                  <>
+                    <VisaBadge />
+                    <MastercardBadge />
+                    <AmexBadge />
+                  </>
+                }
               />
-            </Elements>
-          ) : (
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="text-base font-bold text-black">Complete Your Payment Method</h2>
-              {intentLoading ? (
-                <p className="mt-4 text-sm text-black/45">Preparing secure payment…</p>
+              <PaymentMethodOption
+                selected={payMode === 'simulate'}
+                onClick={() => setPayMode('simulate')}
+                label="Simulated Card"
+                badges={<DemoBadge />}
+              />
+            </div>
+
+            <div className="mt-5 border-t border-gray-100 pt-5">
+              {payMode === 'simulate' ? (
+                <SimulatedPaymentForm bookingId={quotation.bookingId} quotationId={id} stage={stage} />
+              ) : clientSecret ? (
+                <Elements stripe={stripePromise} options={{ clientSecret }}>
+                  <StripeCardForm
+                    quotationId={id}
+                    stage={stage}
+                    clientSecret={clientSecret}
+                    cardholderName={cardholderName}
+                    setCardholderName={setCardholderName}
+                    zip={zip}
+                    setZip={setZip}
+                  />
+                </Elements>
+              ) : intentLoading ? (
+                <p className="text-sm text-black/45">Preparing secure payment…</p>
               ) : (
-                <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
+                <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
                   {intentError}
                 </p>
               )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Right column — Order summary */}
-        <div className="space-y-6">
+        <div>
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-bold text-black">Order Summary</h2>
+            <h2 className="text-lg font-bold text-black">Order Summary</h2>
 
             <div className="mt-4 flex items-center gap-3 border-t border-gray-100 pt-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-black text-sm font-semibold text-white">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-white text-sm font-semibold text-black">
                 {quotation.vendor.logo ? (
                   <img src={quotation.vendor.logo} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -420,62 +628,60 @@ export default function PaymentPage() {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-black">{quotation.vendor.name}</p>
+                <p className="truncate text-base font-bold text-black">{quotation.vendor.name}</p>
                 {quotation.vendor.category ? (
-                  <span className="ui-yellow mt-1 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-black">
+                  <span className="ui-yellow mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">
                     {quotation.vendor.category}
                   </span>
                 ) : null}
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
-              <SummaryRow icon={<EventTypeIcon />} label="Event Type" value={quotation.event.eventType || 'Not specified'} />
-              <SummaryRow icon={<CalendarIcon />} label="Event Date" value={formatEventDate(quotation.event.eventDate)} />
-              <SummaryRow
-                icon={<ClockIcon />}
-                label="Event Time"
-                value={formatTimeRange(quotation.event.startTime, quotation.event.endTime)}
-              />
-              <SummaryRow icon={<PinIcon />} label="Location" value={quotation.event.location || 'Not specified'} />
-              <SummaryRow
-                icon={<GuestsIcon />}
-                label="Guests"
-                value={formatRange(quotation.event.guestsMin, quotation.event.guestsMax)}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-bold text-black">Payment Breakdown</h2>
-
-            <div className="mt-4 border-t border-gray-100">
-              {quotation.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-4 py-2 text-sm">
-                  <span className="text-black/70">{item.serviceName}</span>
-                  <span className="shrink-0 font-semibold text-black">{formatMoney(item.totalPrice)}</span>
-                </div>
-              ))}
-
-              {quotation.charges.map((charge) => (
-                <div key={charge.id} className="flex items-center justify-between gap-4 py-2 text-sm">
-                  <span className="text-black/70">{charge.chargeName}</span>
-                  <span className="shrink-0 font-semibold text-black">{formatMoney(charge.chargePrice)}</span>
-                </div>
-              ))}
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <h3 className="text-sm font-bold text-black">Event Details</h3>
+              <div className="mt-3 space-y-3">
+                <SummaryRow icon={<EventTypeIcon />} label="Event Type" value={quotation.event.eventType || 'Not specified'} />
+                <SummaryRow icon={<CalendarIcon />} label="Date" value={formatEventDate(quotation.event.eventDate)} />
+                <SummaryRow
+                  icon={<ClockIcon />}
+                  label="Time"
+                  value={formatTimeRange(quotation.event.startTime, quotation.event.endTime)}
+                />
+                <SummaryRow icon={<PinIcon />} label="Location" value={quotation.event.location || 'Not specified'} />
+              </div>
             </div>
 
-            <div className="mt-1 flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
-              <span className="text-black/60">Subtotal</span>
-              <span className="font-semibold text-black">{formatMoney(itemsSubtotal)}</span>
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <h3 className="text-sm font-bold text-black">Price Breakdown</h3>
+
+              <div className="mt-3 space-y-2">
+                {quotation.items.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-4 text-sm">
+                    <span className="text-black/60">{item.serviceName}</span>
+                    <span className="shrink-0 font-semibold text-black">{formatMoney(item.totalPrice)}</span>
+                  </div>
+                ))}
+
+                {quotation.charges.map((charge) => (
+                  <div key={charge.id} className="flex items-center justify-between gap-4 text-sm">
+                    <span className="text-black/60">{charge.chargeName}</span>
+                    <span className="shrink-0 font-semibold text-black">{formatMoney(charge.chargePrice)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
+                <span className="text-black/60">Subtotal</span>
+                <span className="font-bold text-black">{formatMoney(itemsSubtotal + chargesSubtotal)}</span>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                <span className="text-base font-extrabold text-black">TOTAL</span>
+                <span className="text-2xl font-extrabold text-green-600">{formatMoney(quotation.grandTotal)}</span>
+              </div>
             </div>
 
-            <div className="mt-1 flex items-center justify-between text-sm">
-              <span className="text-black/60">Grand Total</span>
-              <span className="font-semibold text-black">{formatMoney(quotation.grandTotal)}</span>
-            </div>
-
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-[#F5C400]/10 px-4 py-3.5">
+            <div className="mt-4 flex items-center justify-between rounded-xl bg-[#F5C400]/10 px-4 py-3.5">
               <span className="text-sm font-bold text-black">
                 {stage === 'deposit' ? 'Deposit Due Now (30%)' : 'Balance Due Now'}
               </span>

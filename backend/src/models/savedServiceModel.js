@@ -27,7 +27,6 @@ async function create(user_id, service_id) {
 
   if (error) {
     if (error.code === '23505') {
-      // Already saved — treat as success and hand back the existing row.
       return findOne(user_id, service_id);
     }
     throw new AppError(500, error.message || 'Unable to save service.');

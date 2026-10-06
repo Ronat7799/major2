@@ -12,6 +12,7 @@ const bookingService = require('./bookingService');
 const conversationService = require('./conversationService');
 const serviceService = require('./serviceService');
 const quotationModel = require('../models/quotationModel');
+const quotationService = require('./quotationService');
 const { toVendorProfileView } = require('../utils/vendorView');
 
 const REVENUE_SERIES_PERIODS = ['daily', 'week', 'month', 'year'];
@@ -27,8 +28,6 @@ function shuffle(items) {
   return result;
 }
 
-// The first uploaded portfolio image per service (ascending order means the
-// first occurrence for a given service_id is its earliest/first image).
 async function firstImageByServiceId(serviceIds) {
   const images = await portfolioModel.findByServiceIds(serviceIds);
   const map = new Map();
@@ -40,8 +39,6 @@ async function firstImageByServiceId(serviceIds) {
   return map;
 }
 
-// One card per active service (not per vendor), so a single vendor with several
-// services can still fill multiple featured slots, picked randomly each request.
 async function listFeaturedVendors(limit = FEATURED_VENDOR_LIMIT) {
   const vendors = await vendorModel.listCompletedProfiles();
   if (!vendors.length) {
@@ -72,7 +69,6 @@ async function listFeaturedVendors(limit = FEATURED_VENDOR_LIMIT) {
 
 const BROWSE_PAGE_SIZE = 6;
 
-// Server-side authoritative budget presets — the client sends the key, not raw numbers.
 const BUDGET_RANGES = {
   under_500: { min: 0, max: 500 },
   '500_2000': { min: 500, max: 2000 },
@@ -81,19 +77,12 @@ const BUDGET_RANGES = {
   over_10000: { min: 10000, max: null },
 };
 
-// "Top Rated" is intentionally not offered — ratings are shown per card now,
-// but sorting by them isn't part of this request, so it stays excluded
-// rather than half-built.
 const BROWSE_SORT_COMPARATORS = {
   newest: (a, b) => new Date(b.created_at) - new Date(a.created_at),
   price_asc: (a, b) => a.starting_price - b.starting_price,
   price_desc: (a, b) => b.starting_price - a.starting_price,
 };
 
-// One card per active service (like Featured Vendors), not deduped per vendor,
-// so a vendor with several services can fill multiple slots across the pages.
-// "View Details" still links to /vendors/:vendorId — vendor_id travels with
-// each listing for that purpose.
 async function listBrowseVendors(filters = {}) {
   const page = Math.max(1, parseInt(filters.page, 10) || 1);
   const pageSize = BROWSE_PAGE_SIZE;
@@ -117,9 +106,6 @@ async function listBrowseVendors(filters = {}) {
     maxPrice: budgetRange ? budgetRange.max : undefined,
   });
 
-  // Matches either the service's own name or its vendor's company name —
-  // done here in JS (not as a DB filter) since it needs to check a field
-  // (company_name) that lives on the already-loaded vendor, not the service.
   const searchLower = search.toLowerCase();
   const searchedServices = search
     ? activeServices.filter((service) => {
@@ -133,9 +119,6 @@ async function listBrowseVendors(filters = {}) {
 
   const coverByServiceId = await firstImageByServiceId(searchedServices.map((service) => service.id));
 
-  // Only fetch reviews for vendors that actually made it into this result
-  // set (post category/budget/search filtering), not every completed
-  // profile — same scoping as coverByServiceId above.
   const resultVendorIds = [...new Set(searchedServices.map((service) => service.vendor_id))];
   const reviews = await reviewModel.findByVendorIds(resultVendorIds);
   const reviewsByVendorId = new Map();
@@ -178,26 +161,12 @@ async function listBrowseVendors(filters = {}) {
   return { vendors: pageListings, pagination: { page, pageSize, total, totalPages } };
 }
 
-// Read-only, public vendor detail page (Browse Vendors → View Details).
-// Categories shown are the distinct service categories among the vendor's
-// active services (the schema has no per-vendor category list), falling
-// back to the vendor's own business_category when there are none yet.
-//
-// Browse Vendors shows one card per service, not per vendor, so several
-// cards can point at the same vendor. `serviceId` (the card that was
-// clicked) scopes the Portfolio grid to that one service's own images —
-// otherwise every service's images (up to 12 each) would pool together and
-// look identical no matter which card led here. Falls back to the pooled
-// view when serviceId is missing or doesn't belong to this vendor.
 function summarizeRatings(reviews) {
   const total = reviews.length;
   const average = total ? Number((reviews.reduce((sum, review) => sum + review.rating, 0) / total).toFixed(1)) : null;
   return { average, total };
 }
 
-// A vendor's own reviews, for their dashboard — same review shape the public
-// vendor profile already exposes to customers, just scoped to req.auth
-// instead of a public :id param.
 async function getMyReviews(userId) {
   const vendor = await vendorModel.findByUserId(userId);
   if (!vendor) {
@@ -218,15 +187,6 @@ async function getMyReviews(userId) {
   };
 }
 
-// Powers the "grey out already-booked dates" calendar on the customer's
-// Request a Quotation page — day-level granularity (not time-of-day),
-// matching how these vendor categories actually operate in practice (a
-// caterer/photographer/DJ effectively commits their whole day to one event,
-// not split time slots). Past dates are dropped since there's nothing left
-// to block there. This is a courtesy for the common case only — the
-// authoritative check (which also compares actual times, not just the
-// date) still runs server-side when a quotation is accepted, since a slot
-// can still get taken between when this loads and when the customer submits.
 async function getVendorAvailability(vendorId) {
   const schedule = await bookingModel.findConfirmedScheduleByVendorId(vendorId);
   const today = new Date();
@@ -346,13 +306,6 @@ async function getMyTopServices(userId, period) {
   return serviceService.getTopServicesForVendor(vendor.id, period);
 }
 
-// 'Active' = confirmed bookings (upcoming or already underway) — completed
-// and cancelled bookings don't count. 'Pending quotations' = requests still
-// waiting on this vendor to send a quote (raw status 'pending' maps to the
-// customer-facing 'NEW' label in quotationRequestService). 'Average rating'
-// pulls every review tied to this vendor_id — reviews are left per-booking,
-// not per-service, so this is already an aggregate across every service the
-// vendor has ever been booked for, not just one.
 async function getMyDashboardStats(userId) {
   const vendor = await vendorModel.findByUserId(userId);
   if (!vendor) {
@@ -386,40 +339,41 @@ async function getMyUpcomingEvents(userId, limit) {
   return bookingService.getUpcomingEventsForVendor(vendor.id, limit);
 }
 
-// Powers the vendor dashboard's "Needs Your Attention" card — four small,
-// independent counts bundled into one round trip.
-async function getMyAttentionSummary(userId) {
+async function getMyAttentionSummary(userId, { bookingsSeenSince } = {}) {
+  await quotationService.expireOverdueRevisionRequests();
+
   const vendor = await vendorModel.findByUserId(userId);
   if (!vendor) {
-    return { pendingQuotations: 0, bookingsTomorrow: 0, unreadMessages: 0, paymentsAwaitingConfirmation: 0 };
+    return {
+      pendingQuotations: 0,
+      bookingsTomorrow: 0,
+      unreadMessages: 0,
+      paymentsAwaitingConfirmation: 0,
+      newBookingPayments: 0,
+    };
   }
 
-  const [requests, bookingsTomorrow, unreadMessages, paymentsAwaitingConfirmation] = await Promise.all([
-    quotationRequestModel.listByVendorId(vendor.id),
-    bookingService.countBookingsStartingTomorrowForVendor(vendor.id),
-    conversationService.countUnreadMessagesForVendor(vendor.id, userId),
-    paymentService.countPendingPaymentsForVendor(vendor.id),
-  ]);
+  const seenSince = bookingsSeenSince ? new Date(bookingsSeenSince) : null;
+  const hasSeenSince = seenSince && !Number.isNaN(seenSince.getTime());
 
-  const pendingQuotations = requests.filter((request) => request.status === 'pending').length;
+  const [requests, revisionRequested, bookingsTomorrow, unreadMessages, paymentsAwaitingConfirmation, newBookingPayments] =
+    await Promise.all([
+      quotationRequestModel.listByVendorId(vendor.id),
+      quotationModel.listByVendorIdAndStatus(vendor.id, 'revision_requested', 500),
+      bookingService.countBookingsStartingTomorrowForVendor(vendor.id),
+      conversationService.countUnreadMessagesForVendor(vendor.id, userId),
+      paymentService.countPendingPaymentsForVendor(vendor.id),
+      hasSeenSince ? paymentService.countPaidPaymentsForVendorSince(vendor.id, seenSince) : Promise.resolve(0),
+    ]);
 
-  return { pendingQuotations, bookingsTomorrow, unreadMessages, paymentsAwaitingConfirmation };
+  const pendingQuotations =
+    requests.filter((request) => request.status === 'pending').length + revisionRequested.length;
+
+  return { pendingQuotations, bookingsTomorrow, unreadMessages, paymentsAwaitingConfirmation, newBookingPayments };
 }
 
 const RECENT_ACTIVITY_LIMIT = 8;
 
-// Shared Recent Activity feed — not a tracked event log (nothing new is
-// ever written anywhere), just existing data sources (quotation requests,
-// accepted/revision-requested quotations, completed/cancelled bookings,
-// deposit/balance payments, reviews, customer messages) each queried for
-// their most recent rows and merged into one timeline by timestamp. `types`
-// optionally restricts which event types are included — split by lifecycle
-// stage: the Quotation Requests page only wants pre-acceptance events
-// (quotation_request, quotation_revision_requested), while Booking
-// Management picks up from quotation_accepted onward (payments,
-// completed, cancelled), since that's the moment a request becomes a
-// booking. Each source is still queried up to `limit` rows on its own
-// before merging, so filtering afterward never starves a type of candidates.
 async function getMyRecentActivity(userId, { limit = RECENT_ACTIVITY_LIMIT, types } = {}) {
   const vendor = await vendorModel.findByUserId(userId);
   if (!vendor) {
@@ -441,9 +395,6 @@ async function getMyRecentActivity(userId, { limit = RECENT_ACTIVITY_LIMIT, type
     wantsType('message') ? conversationService.listRecentCustomerMessagesForVendor(vendor.id, userId, limit) : Promise.resolve([]),
   ]);
 
-  // Depends on `bookings` above (needs booking ids), so it can't join the
-  // Promise.all — only runs the extra query when a payment type is actually
-  // requested.
   const paidPayments = wantsPayments ? await paymentService.listPaidPaymentsForBookings(bookings) : [];
 
   const events = [];
@@ -569,9 +520,6 @@ async function getMyRecentActivity(userId, { limit = RECENT_ACTIVITY_LIMIT, type
 
 const NOTIFICATIONS_LIMIT = 50;
 
-// Everything that can ever show up as a notification — the full lifecycle,
-// pre- and post-acceptance, unlike the two vendor pages which each only
-// want their own slice via getMyRecentActivity's `types` filter.
 const NOTIFICATION_TYPES = [
   'quotation_request',
   'quotation_accepted',
@@ -598,9 +546,6 @@ function notificationRangeStart(range) {
   return new Date(Date.now() - NOTIFICATION_RANGE_DAYS[range] * 86400000);
 }
 
-// Same derived data as getMyRecentActivity, just widened to every type and
-// stamped with `unread` from the user's own read cursor (see
-// markMyNotificationsRead) rather than being restricted to one page's slice.
 async function getMyNotifications(userId, { range, limit = NOTIFICATIONS_LIMIT } = {}) {
   const [user, events] = await Promise.all([
     userModel.findById(userId),

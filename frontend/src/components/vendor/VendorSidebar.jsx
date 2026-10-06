@@ -1,5 +1,8 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext.jsx';
+import logo from '../../assets/logo.png';
 
 function DashboardIcon() {
   return (
@@ -109,31 +112,104 @@ function StarIcon() {
 const NAV_ITEMS = [
   { label: 'Dashboard', to: '/vendor/dashboard', icon: DashboardIcon },
   { label: 'Service Management', to: '/vendor/services', icon: ServiceIcon },
-  { label: 'Quotations Request', to: '/vendor/quotation-requests', icon: DocumentIcon },
-  { label: 'Booking Management', to: '/vendor/bookings', icon: BookingIcon },
+  { label: 'Quotations Request', to: '/vendor/quotation-requests', icon: DocumentIcon, badgeKey: 'pendingQuotations' },
+  { label: 'Booking Management', to: '/vendor/bookings', icon: BookingIcon, badgeKey: 'newBookingPayments' },
   { label: 'Message', to: '/vendor/messages', icon: ChatIcon },
   { label: 'Reviews', to: '/vendor/reviews', icon: StarIcon },
   { label: 'Settings', to: '/vendor/settings', icon: GearIcon },
 ];
 
+const PENDING_QUOTATIONS_POLL_MS = 45000;
+
+// When the vendor last opened Booking Management, kept per browser so the
+// badge can count customer payments that arrived since then.
+function bookingsSeenKey(userId) {
+  return `vendorBookingsSeenAt:${userId}`;
+}
+
+function readBookingsSeenAt(userId) {
+  try {
+    return window.localStorage.getItem(bookingsSeenKey(userId));
+  } catch {
+    return null;
+  }
+}
+
+function writeBookingsSeenAt(userId, value) {
+  try {
+    window.localStorage.setItem(bookingsSeenKey(userId), value);
+  } catch {
+    // Storage unavailable (private mode etc.) — the badge just won't persist.
+  }
+}
+
 export default function VendorSidebar() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [pendingQuotations, setPendingQuotations] = useState(0);
+  const [newBookingPayments, setNewBookingPayments] = useState(0);
+  const userId = user?.id;
+  const onBookingsPage = location.pathname.startsWith('/vendor/bookings');
 
   function handleLogout() {
     logout();
     navigate('/login');
   }
 
+  useEffect(() => {
+    if (!userId) return;
+    if (onBookingsPage || !readBookingsSeenAt(userId)) {
+      writeBookingsSeenAt(userId, new Date().toISOString());
+    }
+    if (onBookingsPage) {
+      setNewBookingPayments(0);
+    }
+  }, [userId, onBookingsPage, location.pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function loadPendingQuotations() {
+      const bookingsSeenSince = userId ? readBookingsSeenAt(userId) : null;
+      api
+        .get('/vendors/me/attention', { params: bookingsSeenSince ? { bookingsSeenSince } : {} })
+        .then((response) => {
+          if (!cancelled) {
+            const { attention } = response.data.data;
+            setPendingQuotations(attention.pendingQuotations);
+            setNewBookingPayments(onBookingsPage ? 0 : attention.newBookingPayments || 0);
+          }
+        })
+        .catch(() => {
+        });
+    }
+
+    loadPendingQuotations();
+    const interval = setInterval(loadPendingQuotations, PENDING_QUOTATIONS_POLL_MS);
+    window.addEventListener('vendor-quotation-requests-changed', loadPendingQuotations);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('vendor-quotation-requests-changed', loadPendingQuotations);
+    };
+  }, [userId, onBookingsPage]);
+
   return (
     <aside className="flex min-h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
       <div className="px-6 py-6">
-        <p className="ui-yellow-text text-2xl font-extrabold tracking-tight">Reab Jom</p>
+        <p className="ui-yellow-text flex items-center gap-2 text-2xl font-extrabold tracking-tight">
+          <img src={logo} alt="" className="h-8 w-auto" />
+          ReabJom
+        </p>
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
+          const badgeCounts = { pendingQuotations, newBookingPayments };
+          const badgeCount = item.badgeKey ? badgeCounts[item.badgeKey] : 0;
           return item.to ? (
             <NavLink
               key={item.label}
@@ -144,8 +220,21 @@ export default function VendorSidebar() {
                 }`
               }
             >
-              <Icon />
-              {item.label}
+              {({ isActive }) => (
+                <>
+                  <Icon />
+                  <span className="flex-1">{item.label}</span>
+                  {badgeCount > 0 ? (
+                    <span
+                      className={`flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-xs font-bold ${
+                        isActive ? 'bg-white text-black' : 'bg-[#F5C400] text-black'
+                      }`}
+                    >
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  ) : null}
+                </>
+              )}
             </NavLink>
           ) : (
             <span

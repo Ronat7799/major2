@@ -1,12 +1,5 @@
 import { useReveal, revealStyle } from '../../hooks/useReveal.js';
-
-function StarIcon() {
-  return (
-    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-      <path d="m10 2 2.2 5.1 5.5.5-4.2 3.6 1.3 5.4L10 13.8 5.2 16.6l1.3-5.4-4.2-3.6 5.5-.5L10 2Z" />
-    </svg>
-  );
-}
+import logo from '../../assets/logo.png';
 
 function FacebookIcon() {
   return (
@@ -62,12 +55,12 @@ export default function CustomerFooter() {
     <footer ref={ref} className="border-t border-gray-200 bg-white">
       <div
         style={revealStyle(visible)}
-        className="mx-auto grid max-w-6xl gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4"
+        className="mx-auto grid max-w-[1600px] gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4"
       >
         <div>
-          <p className="ui-yellow-text flex items-center gap-1.5 text-lg font-extrabold">
-            <StarIcon />
-            Reab Jom
+          <p className="ui-yellow-text flex items-center gap-2 text-lg font-extrabold">
+            <img src={logo} alt="" className="h-6 w-auto" />
+            ReabJom
           </p>
           <p className="mt-3 text-sm leading-relaxed text-black/55">
             Plan Your Perfect Event. The most trusted event planning marketplace in Cambodia.
@@ -117,12 +110,12 @@ export default function CustomerFooter() {
       </div>
 
       <div className="border-t border-gray-100 px-6 py-5">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 text-xs text-black/45 sm:flex-row">
+        <div className="mx-auto flex max-w-[1600px] flex-col items-center justify-between gap-3 text-xs text-black/45 sm:flex-row">
           <div className="flex items-center gap-4">
             <span className="transition-colors duration-200 hover:text-black/70">Privacy Policy</span>
             <span className="transition-colors duration-200 hover:text-black/70">Terms of Service</span>
           </div>
-          <p>© {new Date().getFullYear()} Reab Jom. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ReabJom. All rights reserved.</p>
         </div>
       </div>
     </footer>

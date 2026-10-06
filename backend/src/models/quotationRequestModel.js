@@ -1,15 +1,25 @@
 const supabase = require('../config/supabase');
 const AppError = require('../utils/AppError');
 
-const REQUEST_COLUMNS =
+const BASE_REQUEST_COLUMNS =
   'id, customer_id, vendor_id, event_type, event_date, start_time, end_time, event_location, guests_min, guests_max, budget_min, budget_max, additional_event_description, status, created_at, updated_at';
+const REQUEST_COLUMNS = `${BASE_REQUEST_COLUMNS}, service_id`;
+
+function isMissingColumnError(error) {
+  return error?.code === '42703';
+}
 
 async function createRequest(fields) {
-  const { data, error } = await supabase
-    .from('quotation_requests')
-    .insert(fields)
-    .select(REQUEST_COLUMNS)
-    .single();
+  let { data, error } = await supabase.from('quotation_requests').insert(fields).select(REQUEST_COLUMNS).single();
+
+  if (error && isMissingColumnError(error)) {
+    const { service_id, ...baseFields } = fields;
+    ({ data, error } = await supabase
+      .from('quotation_requests')
+      .insert(baseFields)
+      .select(BASE_REQUEST_COLUMNS)
+      .single());
+  }
 
   if (error) {
     if (error.code === '23505') {
@@ -56,11 +66,19 @@ async function createRequestImages(quotationRequestId, imageUrls) {
 }
 
 async function listByVendorId(vendor_id) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('quotation_requests')
     .select(`${REQUEST_COLUMNS}, users(full_name)`)
     .eq('vendor_id', vendor_id)
     .order('created_at', { ascending: false });
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('quotation_requests')
+      .select(`${BASE_REQUEST_COLUMNS}, users(full_name)`)
+      .eq('vendor_id', vendor_id)
+      .order('created_at', { ascending: false }));
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to list quotation requests.');
@@ -70,12 +88,21 @@ async function listByVendorId(vendor_id) {
 }
 
 async function findByIdForVendor(id, vendor_id) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('quotation_requests')
     .select(`${REQUEST_COLUMNS}, users(full_name, email, phone, created_at)`)
     .eq('id', id)
     .eq('vendor_id', vendor_id)
     .maybeSingle();
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('quotation_requests')
+      .select(`${BASE_REQUEST_COLUMNS}, users(full_name, email, phone, created_at)`)
+      .eq('id', id)
+      .eq('vendor_id', vendor_id)
+      .maybeSingle());
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to load quotation request.');
@@ -112,11 +139,19 @@ async function findImagesByRequestId(quotation_request_id) {
 }
 
 async function findById(id) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('quotation_requests')
     .select(`${REQUEST_COLUMNS}, vendors(company_name, profile_image, business_address)`)
     .eq('id', id)
     .maybeSingle();
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('quotation_requests')
+      .select(`${BASE_REQUEST_COLUMNS}, vendors(company_name, profile_image, business_address)`)
+      .eq('id', id)
+      .maybeSingle());
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to load quotation request.');
@@ -130,7 +165,11 @@ async function findByIds(ids) {
     return [];
   }
 
-  const { data, error } = await supabase.from('quotation_requests').select(REQUEST_COLUMNS).in('id', ids);
+  let { data, error } = await supabase.from('quotation_requests').select(REQUEST_COLUMNS).in('id', ids);
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase.from('quotation_requests').select(BASE_REQUEST_COLUMNS).in('id', ids));
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to list quotation requests.');
@@ -140,11 +179,19 @@ async function findByIds(ids) {
 }
 
 async function listByCustomerId(customer_id) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('quotation_requests')
     .select(`${REQUEST_COLUMNS}, vendors(company_name, profile_image)`)
     .eq('customer_id', customer_id)
     .order('created_at', { ascending: false });
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('quotation_requests')
+      .select(`${BASE_REQUEST_COLUMNS}, vendors(company_name, profile_image)`)
+      .eq('customer_id', customer_id)
+      .order('created_at', { ascending: false }));
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to list quotation requests.');
@@ -154,12 +201,21 @@ async function listByCustomerId(customer_id) {
 }
 
 async function updateStatus(id, status) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('quotation_requests')
     .update({ status })
     .eq('id', id)
     .select(REQUEST_COLUMNS)
     .maybeSingle();
+
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('quotation_requests')
+      .update({ status })
+      .eq('id', id)
+      .select(BASE_REQUEST_COLUMNS)
+      .maybeSingle());
+  }
 
   if (error) {
     throw new AppError(500, error.message || 'Unable to update quotation request status.');

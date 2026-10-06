@@ -3,11 +3,6 @@ const env = require('../config/env');
 const paymentService = require('../services/paymentService');
 const vendorPayoutService = require('../services/vendorPayoutService');
 
-// Stripe posts here with the raw request body (see app.js — this route is
-// mounted with express.raw, not express.json, since signature verification
-// needs the exact bytes Stripe signed). Not a normal REST endpoint, so it
-// doesn't use the app's usual success()/fail() response envelope — Stripe
-// just needs a 200 to stop retrying.
 async function handleStripeWebhook(req, res) {
   if (!env.stripeWebhookSecret) {
     console.error('STRIPE_WEBHOOK_SECRET is not configured — cannot verify webhook signatures.');

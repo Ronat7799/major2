@@ -80,7 +80,7 @@ export default function FeaturedVendors() {
 
   return (
     <section ref={ref} className="bg-gray-50 px-6 py-14">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-[1600px]">
         <div className="flex items-end justify-between">
           <div style={revealStyle(visible, 150)}>
             <h2 className="text-2xl font-bold text-black">Featured Vendors</h2>
@@ -110,7 +110,7 @@ export default function FeaturedVendors() {
                 style={revealStyle(visible, 300 + index * 120)}
                 className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
               >
-                <div className="relative h-36 w-full bg-gray-100">
+                <div className="relative h-48 w-full bg-gray-100">
                   <div className="h-full w-full overflow-hidden">
                     {vendor.cover_image ? (
                       <img

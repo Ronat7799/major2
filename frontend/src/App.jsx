@@ -40,9 +40,6 @@ import VendorChangePasswordPage from './pages/vendor/VendorChangePasswordPage.js
 
 export default function App() {
   const location = useLocation();
-  // When Login is opened from within the app (nav link, guarded action), the
-  // caller stashes the page it was on as backgroundLocation so that page keeps
-  // rendering underneath the login modal instead of being replaced by it.
   const backgroundLocation = location.state?.backgroundLocation;
 
   return (
@@ -82,7 +79,6 @@ export default function App() {
           <Route path="bookings/:id/review" element={<ReviewPage />} />
           <Route path="messages" element={<CustomerMessagesPage />} />
         </Route>
-        {/* Public: guests and customers can browse the homepage and vendors without logging in. */}
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<CustomerHomePage />} />
           <Route path="/vendors" element={<BrowseVendorsPage />} />

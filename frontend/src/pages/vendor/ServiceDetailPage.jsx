@@ -85,7 +85,6 @@ export default function ServiceDetailPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
@@ -115,7 +114,7 @@ export default function ServiceDetailPage() {
   const thumbnails = images.slice(1);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div>
       <button
         type="button"
         onClick={() => navigate('/vendor/services')}
@@ -126,7 +125,7 @@ export default function ServiceDetailPage() {
       </button>
 
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="relative h-72 w-full bg-gray-100">
+        <div className="relative h-80 w-full bg-gray-100 sm:h-96">
           {mainImage ? (
             <img src={mainImage} alt={service.service_name} className="h-full w-full object-cover" />
           ) : (
@@ -136,12 +135,20 @@ export default function ServiceDetailPage() {
           )}
 
           <span
-            className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+            className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide shadow-sm ${
               service.availability === 'Inactive' ? 'bg-rose-500 text-white' : 'ui-yellow text-black'
             }`}
           >
             {service.availability === 'Inactive' ? 'Unavailable' : 'Available'}
           </span>
+
+          <button
+            type="button"
+            onClick={() => navigate(`/vendor/services/${service.id}/edit`, { state: { service } })}
+            className="ui-yellow ui-yellow-hover absolute right-4 top-4 rounded-full px-5 py-2 text-sm font-semibold text-black shadow-sm"
+          >
+            Edit Service
+          </button>
         </div>
 
         {thumbnails.length > 0 ? (
@@ -157,21 +164,12 @@ export default function ServiceDetailPage() {
           </div>
         ) : null}
 
-        <div className="p-6 sm:p-8">
+        <div className="p-7 sm:p-10">
           <span className="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-black/50">
             {service.service_category || 'Uncategorized'}
           </span>
 
-          <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-            <h1 className="text-2xl font-bold text-black">{service.service_name}</h1>
-            <button
-              type="button"
-              onClick={() => navigate(`/vendor/services/${service.id}/edit`, { state: { service } })}
-              className="ui-yellow ui-yellow-hover shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold text-black"
-            >
-              Edit Service
-            </button>
-          </div>
+          <h1 className="mt-3 text-2xl font-bold text-black">{service.service_name}</h1>
 
           {service.service_description ? (
             <p className="mt-3 text-sm leading-relaxed text-black/60">{service.service_description}</p>

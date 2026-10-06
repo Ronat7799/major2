@@ -205,18 +205,18 @@ export default function VendorProfilePage() {
 
   if (!isEditing) {
     return (
-      <div className="mx-auto max-w-4xl">
+      <div>
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-          <div className="h-44 w-full bg-gray-100 sm:h-52">
+          <div className="h-52 w-full bg-gray-100 sm:h-60">
             {profile.cover_image ? (
               <img src={profile.cover_image} alt="Cover" className="h-full w-full object-cover" />
             ) : null}
           </div>
 
-          <div className="px-6 pb-6 sm:px-8">
+          <div className="px-6 pb-7 sm:px-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div className="-mt-12 flex items-end gap-4 sm:-mt-10">
-                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border-4 border-white bg-black shadow-sm sm:h-24 sm:w-24">
+              <div className="-mt-14 flex items-end gap-4">
+                <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-black shadow-sm sm:h-28 sm:w-28">
                   {profile.profile_image ? (
                     <img src={profile.profile_image} alt="Company logo" className="h-full w-full object-cover" />
                   ) : null}
@@ -248,17 +248,19 @@ export default function VendorProfilePage() {
 
           <div className="border-t border-gray-100" />
 
-          <div className="space-y-8 px-6 py-6 sm:px-8 sm:py-8">
+          <div className="space-y-8 px-6 py-7 sm:px-8 sm:py-10">
             <section>
               <SectionHeading>Basic Information</SectionHeading>
-              <div className="mt-4 space-y-5">
+              <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
                 <InfoField label="Company Name" value={profile.company_name} />
                 <InfoField label="Owner / Manager Name" value={profile.contact_person} />
                 <InfoField label="Years of Experience" value={profile.year_of_experience} />
-                <InfoField label="Languages Spoken" value={profile.languages_spoken.join(', ')} />
                 <InfoField label="Business Category" value={profile.business_category} />
                 <InfoField label="Business Address" value={profile.business_address} />
-                <InfoField label="Company Description" value={profile.business_description} multiline />
+                <InfoField label="Languages Spoken" value={profile.languages_spoken.join(', ')} />
+                <div className="md:col-span-2">
+                  <InfoField label="Company Description" value={profile.business_description} multiline />
+                </div>
               </div>
             </section>
 
@@ -267,19 +269,21 @@ export default function VendorProfilePage() {
             <section>
               <SectionHeading>Contact Information</SectionHeading>
               <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
-                <div className="space-y-5">
+                <div className="flex h-full flex-col justify-between gap-5">
                   <InfoField label="Phone Number" value={profile.phone} />
                   <InfoField label="Email Address" value={profile.email} />
                   <InfoField label="Office Address" value={profile.full_address} />
                 </div>
-                <div>
+                <div className="flex h-full flex-col">
                   <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-black/40">
                     Google Maps Location
                   </span>
-                  <LocationView
-                    latitude={profile.latitude === '' ? null : profile.latitude}
-                    longitude={profile.longitude === '' ? null : profile.longitude}
-                  />
+                  <div className="flex-1">
+                    <LocationView
+                      latitude={profile.latitude === '' ? null : profile.latitude}
+                      longitude={profile.longitude === '' ? null : profile.longitude}
+                    />
+                  </div>
                 </div>
               </div>
             </section>
@@ -293,9 +297,9 @@ export default function VendorProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div>
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="relative h-44 w-full bg-gray-100 sm:h-52">
+        <div className="relative h-52 w-full bg-gray-100 sm:h-60">
           {form.cover_image ? (
             <img src={form.cover_image} alt="Cover" className="h-full w-full object-cover" />
           ) : null}
@@ -311,9 +315,9 @@ export default function VendorProfilePage() {
           </label>
         </div>
 
-        <div className="px-6 pb-6 sm:px-8">
-          <div className="-mt-12 flex items-end gap-4 sm:-mt-10">
-            <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24">
+        <div className="px-6 pb-7 sm:px-8">
+          <div className="-mt-14 flex items-end gap-4">
+            <div className="relative h-24 w-24 shrink-0 sm:h-28 sm:w-28">
               <div className="h-full w-full overflow-hidden rounded-full border-4 border-white bg-black shadow-sm">
                 {form.profile_image ? (
                   <img src={form.profile_image} alt="Company logo" className="h-full w-full object-cover" />
@@ -337,76 +341,82 @@ export default function VendorProfilePage() {
 
         <div className="border-t border-gray-100" />
 
-        <form onSubmit={handleSubmit} className="space-y-8 px-6 py-6 sm:px-8 sm:py-8">
+        <form onSubmit={handleSubmit} className="space-y-8 px-6 py-7 sm:px-8 sm:py-10">
           <section className="space-y-5">
             <SectionHeading>Basic Information</SectionHeading>
-            <TextField
-              label="Company Name"
-              value={form.company_name}
-              onChange={(event) => update('company_name', event.target.value)}
-              required
-            />
-            <TextField
-              label="Owner / Manager Name"
-              value={form.contact_person}
-              onChange={(event) => update('contact_person', event.target.value)}
-              required
-            />
-            <TextField
-              label="Years of Experience"
-              type="number"
-              value={form.year_of_experience}
-              onChange={(event) => update('year_of_experience', event.target.value)}
-            />
-            <MultiSelectPills
-              label="Languages Spoken"
-              helperText={`Select up to ${MAX_VENDOR_LANGUAGES} languages.`}
-              options={VENDOR_LANGUAGES}
-              value={form.languages_spoken}
-              onChange={(value) => update('languages_spoken', value)}
-              max={MAX_VENDOR_LANGUAGES}
-            />
-            <SelectField
-              label="Business Category"
-              placeholder="Select a category"
-              value={form.business_category}
-              onChange={(event) => update('business_category', event.target.value)}
-              options={VENDOR_CATEGORIES}
-            />
-            <SelectField
-              label="Business Address"
-              placeholder="Select a location"
-              value={form.business_address}
-              onChange={(event) => update('business_address', event.target.value)}
-              options={VENDOR_LOCATIONS}
-            />
-            <TextAreaField
-              label="Company Description"
-              value={form.business_description}
-              onChange={(event) => update('business_description', event.target.value)}
-            />
+            <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+              <TextField
+                label="Company Name"
+                value={form.company_name}
+                onChange={(event) => update('company_name', event.target.value)}
+                required
+              />
+              <TextField
+                label="Owner / Manager Name"
+                value={form.contact_person}
+                onChange={(event) => update('contact_person', event.target.value)}
+                required
+              />
+              <TextField
+                label="Years of Experience"
+                type="number"
+                value={form.year_of_experience}
+                onChange={(event) => update('year_of_experience', event.target.value)}
+              />
+              <SelectField
+                label="Business Category"
+                placeholder="Select a category"
+                value={form.business_category}
+                onChange={(event) => update('business_category', event.target.value)}
+                options={VENDOR_CATEGORIES}
+              />
+              <SelectField
+                label="Business Address"
+                placeholder="Select a location"
+                value={form.business_address}
+                onChange={(event) => update('business_address', event.target.value)}
+                options={VENDOR_LOCATIONS}
+              />
+              <MultiSelectPills
+                label="Languages Spoken"
+                helperText={`Select up to ${MAX_VENDOR_LANGUAGES} languages.`}
+                options={VENDOR_LANGUAGES}
+                value={form.languages_spoken}
+                onChange={(value) => update('languages_spoken', value)}
+                max={MAX_VENDOR_LANGUAGES}
+              />
+              <div className="md:col-span-2">
+                <TextAreaField
+                  label="Company Description"
+                  value={form.business_description}
+                  onChange={(event) => update('business_description', event.target.value)}
+                />
+              </div>
+            </div>
           </section>
 
           <div className="border-t border-gray-100" />
 
           <section className="space-y-5">
             <SectionHeading>Contact Information</SectionHeading>
-            <TextField
-              label="Phone Number"
-              type="tel"
-              value={form.phone}
-              onChange={(event) => update('phone', event.target.value)}
-            />
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-black">Email Address</span>
-              <input
-                type="email"
-                value={form.email}
-                readOnly
-                disabled
-                className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-black/60 outline-none"
+            <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+              <TextField
+                label="Phone Number"
+                type="tel"
+                value={form.phone}
+                onChange={(event) => update('phone', event.target.value)}
               />
-            </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-black">Email Address</span>
+                <input
+                  type="email"
+                  value={form.email}
+                  readOnly
+                  disabled
+                  className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-black/60 outline-none"
+                />
+              </label>
+            </div>
             <LocationPicker
               value={{
                 full_address: form.full_address,

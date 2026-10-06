@@ -14,9 +14,6 @@ function formatBookingCode(id) {
   return `BK-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 }
 
-// A conversation is created once, the first time a booking exists for it.
-// Safe to call more than once for the same booking — createConversation
-// returns the existing row on the unique constraint instead of erroring.
 async function ensureConversationForBooking(booking) {
   return conversationModel.createConversation({
     booking_id: booking.id,
@@ -33,10 +30,6 @@ async function findConversationIdForBooking(bookingId) {
   return conversation ? conversation.id : null;
 }
 
-// Attaches quotation + quotation_request event details to a batch of
-// conversation rows (each already embedding its booking, if any). Done as
-// two batched lookups rather than per-row queries. A pre-booking chat
-// invite has no booking, so it carries its own quotation_id directly.
 async function attachEventDetails(rows) {
   const quotationIds = [...new Set(rows.map((row) => row.bookings?.quotation_id || row.quotation_id).filter(Boolean))];
   const quotations = await quotationModel.findByIds(quotationIds);
@@ -182,9 +175,6 @@ async function sendMessage(auth, conversationId, text) {
     throw new AppError(403, 'This chat is no longer available.');
   }
 
-  // A still-pending invite works like a Messenger message request: the
-  // vendor (who sent the invite) can message ahead, but the customer can
-  // only read until they accept.
   if (conversation.status === 'invited' && auth.role !== 'vendor') {
     throw new AppError(403, 'This chat has not been accepted yet.');
   }
@@ -217,10 +207,6 @@ async function markConversationRead(auth, conversationId) {
   await messageModel.markReadForConversation(conversationId, auth.sub);
 }
 
-// Vendor-initiated chat invite for a quotation still in revision_requested —
-// no booking exists yet. Idempotent: calling this again for the same
-// quotation returns the existing invite instead of erroring (see
-// conversationModel.createInvite).
 async function createInviteForQuotation({ quotationId, vendorId, customerId }) {
   return conversationModel.createInvite({ quotation_id: quotationId, vendor_id: vendorId, user_id: customerId });
 }
@@ -229,10 +215,6 @@ async function findInviteForQuotation(quotationId) {
   return conversationModel.findByQuotationId(quotationId);
 }
 
-// Customer answers a pending chat invite. Only the invited customer can
-// respond (loadOwnedConversation already enforces that), and only once —
-// answering an already-answered invite is rejected rather than silently
-// re-applied.
 async function respondToInvite(auth, conversationId, decision) {
   const conversation = await loadOwnedConversation(auth, conversationId);
 
@@ -244,9 +226,6 @@ async function respondToInvite(auth, conversationId, decision) {
   return { id: updated.id, status: updated.status };
 }
 
-// Recent messages sent TO this vendor (i.e. by the customer side of each
-// conversation), with the customer's name attached — used by the vendor
-// dashboard's Recent Activity feed.
 async function listRecentCustomerMessagesForVendor(vendorId, vendorUserId, limit = 10) {
   const conversations = await conversationModel.listForVendor(vendorId);
   if (!conversations.length) {
@@ -271,8 +250,6 @@ async function listRecentCustomerMessagesForVendor(vendorId, vendorUserId, limit
   }));
 }
 
-// Total unread messages across every conversation this vendor is part of —
-// used by the vendor dashboard's "needs your attention" summary.
 async function countUnreadMessagesForVendor(vendorId, vendorUserId) {
   const conversations = await conversationModel.listForVendor(vendorId);
   if (!conversations.length) {

@@ -18,10 +18,6 @@ async function assertParticipant(auth, conversationId) {
   return isParticipant ? conversation : null;
 }
 
-// In-memory presence: how many active sockets each side (customer/vendor) has
-// open in a conversation room. Single Node process only — fine at this
-// project's scale; scaling across multiple server instances would need a
-// shared store (e.g. the Redis socket.io adapter) instead.
 const presenceByRoom = new Map();
 
 function bumpPresence(room, side, delta) {
@@ -75,8 +71,6 @@ function initChatSocket(io) {
           socket.to(room).emit('user_online', { conversationId, side });
         }
 
-        // Presence is edge-triggered (an event fires only on the next join/leave),
-        // so whoever joins later needs the current snapshot too, not just future events.
         const counts = presenceByRoom.get(room);
         return callback?.({
           success: true,
@@ -111,7 +105,6 @@ function initChatSocket(io) {
       }
     });
 
-    // Placeholder only — relays a transient typing signal, nothing persisted.
     socket.on('user_typing', ({ conversationId } = {}) => {
       const room = roomName(conversationId);
       if (!joinedRooms.has(room)) return;

@@ -4,9 +4,6 @@ const AppError = require('../utils/AppError');
 const BASE_USER_COLUMNS = 'id, full_name, email, phone, password, role, notifications_last_read_at, created_at, updated_at';
 const USER_COLUMNS = `${BASE_USER_COLUMNS}, profile_image`;
 
-// profile_image (migration 20260921000000) may not exist yet on a database
-// that hasn't been migrated — same fallback pattern as quotationModel, so
-// login/register/etc. keep working while only the avatar feature waits on it.
 function isMissingColumnError(error) {
   return error?.code === '42703';
 }

@@ -2,9 +2,6 @@ const AppError = require('../utils/AppError');
 const reviewModel = require('../models/reviewModel');
 const bookingModel = require('../models/bookingModel');
 
-// A customer can only review a booking they own once it's completed — the
-// DB's unique index on booking_id backs up the "one review per booking"
-// rule at the data layer too.
 async function createReviewForBooking(customerId, bookingId, payload) {
   const booking = await bookingModel.findByIdForUser(bookingId, customerId);
   if (!booking) {

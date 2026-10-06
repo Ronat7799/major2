@@ -16,5 +16,5 @@ const io = new Server(server, {
 initChatSocket(io);
 
 server.listen(env.port, () => {
-  console.log(`Reabjom API listening on http://localhost:${env.port}`);
+  console.log(`ReabJom API listening on http://localhost:${env.port}`);
 });

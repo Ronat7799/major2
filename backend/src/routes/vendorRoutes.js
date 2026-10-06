@@ -8,7 +8,6 @@ const { vendorProfileRules, validateRequest } = require('../middleware/validateR
 
 const router = express.Router();
 
-// Public: customers can browse vendors without logging in.
 router.get('/', vendorController.listBrowse);
 router.get('/featured', vendorController.listFeatured);
 
@@ -64,13 +63,8 @@ router.post(
 );
 router.get('/me/stripe/status', authenticate, requireRole('vendor'), vendorPayoutController.getStatus);
 
-// Public: powers the "already booked" calendar on the Request a Quotation
-// page — no login needed since browsing a vendor's availability is part of
-// deciding whether to request a quote in the first place.
 router.get('/:id/availability', vendorController.getVendorAvailability);
 
-// Public: customers (and guests) can view a vendor's detail page without logging in.
-// Kept last so it doesn't shadow the literal routes above (e.g. /featured, /me).
 router.get('/:id', vendorController.getVendorDetail);
 
 module.exports = router;

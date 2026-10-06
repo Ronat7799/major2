@@ -9,7 +9,7 @@ export default function AccountPage() {
     <div className="min-h-screen bg-[#f3f3f3]">
       <header className="ui-yellow">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 py-4">
-          <p className="text-xl font-bold text-black">Reabjom</p>
+          <p className="text-xl font-bold text-black">ReabJom</p>
           <button
             type="button"
             onClick={() => {

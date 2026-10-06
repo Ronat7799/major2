@@ -1,16 +1,5 @@
 const BASE_URL = 'https://nominatim.openstreetmap.org';
 
-// Nominatim's display_name is the full admin hierarchy (place name, street, commune,
-// district, city/province, postcode, country). Keep only the meaningful parts:
-// named place (if any) + street, district, and province/capital.
-//
-// Two Cambodia-specific quirks drive the ordering here:
-// - A named landmark (market, monument, temple) is tagged as amenity/tourism/shop,
-//   while `road` is often just a generic street name — the landmark should win.
-// - Nominatim's `city` sometimes duplicates the district value (e.g. both "city"
-//   and "county" equal the same town name), while `state` reliably holds the
-//   actual province/capital name — so the top tier reads `state` first rather
-//   than `city`, or a real dedupe would silently drop the province/capital.
 export function buildShortAddress(address, fallback) {
   if (!address) {
     return fallback || null;

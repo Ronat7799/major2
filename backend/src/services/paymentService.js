@@ -6,7 +6,6 @@ const quotationModel = require('../models/quotationModel');
 const vendorModel = require('../models/vendorModel');
 const { DEPOSIT_RATE, PLATFORM_COMMISSION_RATE } = require('../config/paymentConfig');
 
-// Stripe expects the smallest currency unit (cents for USD).
 function toCents(amount) {
   return Math.round(Number(amount) * 100);
 }
@@ -25,17 +24,6 @@ function rowSummary(amount, row) {
   };
 }
 
-// Pure function: given a quotation's grand_total and every payment row a
-// booking currently has (0, 1, or 2), derives the deposit/balance amounts
-// and per-stage statuses used by both intent creation and the booking
-// read/complete paths.
-//
-// Backward compatibility: a booking with a single legacy payment_type
-// 'full' row (predates this feature) is treated as covering both stages
-// at once — depositAmount/balanceAmount still split for display, but
-// "paid" is driven entirely by that one row's own status. This is what
-// makes an old fully-paid booking keep reading as fully paid with no
-// data migration.
 function buildPaymentSummary(grandTotal, payments) {
   const total = Number(grandTotal) || 0;
   const depositAmount = roundMoney(total * DEPOSIT_RATE);
@@ -80,16 +68,14 @@ async function getPaymentSummaryForBooking(bookingId) {
   return buildPaymentSummary(quotation ? quotation.grand_total : 0, payments);
 }
 
-// Creates (or reuses) a Stripe Payment Intent for one stage (deposit or
-// balance) of a booking's payment, and mirrors it as a 'pending' row in
-// the payments table. Always checks the intent's live Stripe status before
-// reusing it — our own payment_status can lag behind Stripe's (e.g. a
-// delayed webhook) — so a booking never gets handed a client secret for an
-// intent that's already finished on Stripe's side.
 async function createPaymentIntentForBooking(customerId, bookingId, paymentType) {
   const booking = await bookingModel.findByIdForUser(bookingId, customerId);
   if (!booking) {
     throw new AppError(404, 'Booking not found.');
+  }
+
+  if (booking.status !== 'confirmed') {
+    throw new AppError(409, 'This booking is no longer accepting payments.');
   }
 
   const quotation = await quotationModel.findById(booking.quotation_id);
@@ -127,9 +113,6 @@ async function createPaymentIntentForBooking(customerId, bookingId, paymentType)
   if (existingPayment?.transaction_id) {
     const existingIntent = await stripe.paymentIntents.retrieve(existingPayment.transaction_id);
 
-    // Our own row can lag behind Stripe's real state (e.g. a webhook that
-    // hasn't arrived yet) — never hand back an intent that Stripe itself
-    // already considers finished, since confirming it again always fails.
     if (existingIntent.status === 'succeeded') {
       await paymentModel.updateByTransactionId(existingIntent.id, {
         payment_status: 'paid',
@@ -142,8 +125,6 @@ async function createPaymentIntentForBooking(customerId, bookingId, paymentType)
       return { clientSecret: existingIntent.client_secret, amount: existingPayment.amount, paymentType };
     }
 
-    // Any other terminal state (canceled, etc.) — replace it in place with
-    // a fresh intent rather than leaving a second row for the same stage.
     const freshIntent = await stripe.paymentIntents.create({
       amount: toCents(amount),
       currency: 'usd',
@@ -184,16 +165,100 @@ async function createPaymentIntentForBooking(customerId, bookingId, paymentType)
   return { clientSecret: paymentIntent.client_secret, amount, paymentType };
 }
 
-// A vendor's net take-home for the current calendar month — the
-// customer-paid amount minus the platform's commission, mirroring the split
-// Stripe itself applies at charge time (see createPaymentIntentForBooking's
-// application_fee_amount) — plus the percent change vs last calendar
-// month's total, the same "vs last period" comparison Revenue Overview and
-// Booking Status already show. Fixed to "this month" since this card has no
-// period picker. Legacy pre-Connect 'full' rows never had a real commission
-// split applied on Stripe's side, but are counted the same way here for a
-// consistent, simple dashboard figure rather than tracking two different
-// revenue definitions.
+function isPlausibleCardNumber(cardNumber) {
+  const digits = cardNumber.replace(/\D/g, '');
+  return digits.length >= 12 && digits.length <= 19;
+}
+
+function assertValidSimulatedCard(card) {
+  const cardNumber = String(card?.cardNumber || '').trim();
+  if (!isPlausibleCardNumber(cardNumber)) {
+    throw new AppError(400, 'Enter a card number between 12 and 19 digits.');
+  }
+
+  const match = /^(\d{1,2})\s*\/\s*(\d{2})$/.exec(String(card?.expiry || '').trim());
+  if (!match) {
+    throw new AppError(400, 'Enter the expiry date as MM/YY.');
+  }
+
+  const expMonth = Number(match[1]);
+  const expYear = 2000 + Number(match[2]);
+  if (expMonth < 1 || expMonth > 12) {
+    throw new AppError(400, 'Enter a valid expiry month.');
+  }
+
+  const firstDayAfterExpiry = new Date(expYear, expMonth, 1);
+  if (firstDayAfterExpiry <= new Date()) {
+    throw new AppError(400, 'This card has expired.');
+  }
+
+  if (!/^\d{3,4}$/.test(String(card?.cvc || '').trim())) {
+    throw new AppError(400, 'Enter a valid CVC.');
+  }
+
+  return cardNumber;
+}
+
+async function simulatePaymentForBooking(customerId, bookingId, paymentType, card) {
+  const booking = await bookingModel.findByIdForUser(bookingId, customerId);
+  if (!booking) {
+    throw new AppError(404, 'Booking not found.');
+  }
+
+  if (booking.status !== 'confirmed') {
+    throw new AppError(409, 'This booking is no longer accepting payments.');
+  }
+
+  const cardNumber = assertValidSimulatedCard(card);
+
+  const quotation = await quotationModel.findById(booking.quotation_id);
+  if (!quotation) {
+    throw new AppError(404, 'Quotation for this booking was not found.');
+  }
+
+  const allPayments = await paymentModel.findAllByBookingId(bookingId);
+  const summary = buildPaymentSummary(quotation.grand_total, allPayments);
+
+  if (summary.fullyPaid) {
+    throw new AppError(409, 'This booking has already been paid.');
+  }
+
+  if (paymentType === 'balance' && !summary.deposit.paid) {
+    throw new AppError(409, 'The deposit must be paid before paying the balance.');
+  }
+
+  const existingPayment = allPayments.find((payment) => payment.payment_type === paymentType) || null;
+  if (existingPayment?.payment_status === 'paid') {
+    throw new AppError(409, `The ${paymentType} for this booking has already been paid.`);
+  }
+
+  const amount = paymentType === 'deposit' ? summary.depositAmount : summary.balanceAmount;
+  const transactionId = `SIMULATED-${bookingId}-${paymentType}-${Date.now()}`;
+  const paidAt = new Date().toISOString();
+
+  if (existingPayment) {
+    await paymentModel.updateByTransactionId(existingPayment.transaction_id, {
+      payment_status: 'paid',
+      payment_method: 'simulated',
+      transaction_id: transactionId,
+      amount,
+      paid_at: paidAt,
+    });
+  } else {
+    await paymentModel.createPayment({
+      booking_id: bookingId,
+      amount,
+      payment_method: 'simulated',
+      transaction_id: transactionId,
+      payment_status: 'paid',
+      payment_type: paymentType,
+      paid_at: paidAt,
+    });
+  }
+
+  return { amount, paymentType, cardLast4: cardNumber.slice(-4) };
+}
+
 async function getVendorRevenue(vendorId) {
   const now = new Date();
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -252,10 +317,6 @@ function formatDayLabel(date) {
   return `${MONTH_LABELS[date.getMonth()]} ${date.getDate()}`;
 }
 
-// Builds the current window's chart buckets plus a same-length "previous
-// period" window for the %-change comparison, all as contiguous, real
-// calendar ranges ending "now" — e.g. 'week' is the last 7 days (today
-// included) vs. the 7 days before that, not calendar Mon-Sun.
 function buildRevenueSeriesWindow(period, now) {
   const today = startOfDay(now);
 
@@ -310,7 +371,6 @@ function buildRevenueSeriesWindow(period, now) {
     };
   }
 
-  // 'year' — 12 calendar months ending with the current month.
   const startMonth = addMonths(new Date(today.getFullYear(), today.getMonth(), 1), -11);
   const buckets = [];
   for (let offset = 0; offset < 12; offset += 1) {
@@ -326,9 +386,6 @@ function buildRevenueSeriesWindow(period, now) {
   };
 }
 
-// Same net-revenue definition as getVendorRevenue (amount minus platform
-// commission), but bucketed into a time series for the Revenue Overview
-// chart, plus a %-change vs. the immediately preceding equal-length window.
 async function getVendorRevenueSeries(vendorId, period) {
   const safePeriod = REVENUE_SERIES_PERIODS.includes(period) ? period : 'month';
   const { buckets, windowStart, windowEnd, previousStart, previousEnd } = buildRevenueSeriesWindow(
@@ -378,10 +435,6 @@ async function getVendorRevenueSeries(vendorId, period) {
   };
 }
 
-// Paid deposit/balance payments across a vendor's own bookings — used by the
-// vendor Recent Activity feed. Takes the booking list rather than a vendorId
-// so the caller (which already needed the bookings for other event types)
-// doesn't pay for that query twice.
 async function listPaidPaymentsForBookings(bookings) {
   if (!bookings.length) {
     return [];
@@ -395,10 +448,6 @@ async function listPaidPaymentsForBookings(bookings) {
     .map((payment) => ({ ...payment, booking: bookingsById.get(payment.booking_id) }));
 }
 
-// Payments Stripe hasn't confirmed one way or the other yet — a customer
-// started paying (a Payment Intent exists) but no payment_intent.succeeded/
-// payment_failed webhook has landed. Used by the vendor dashboard's "needs
-// your attention" summary.
 async function countPendingPaymentsForVendor(vendorId) {
   const bookings = await bookingModel.listByVendorId(vendorId);
   if (!bookings.length) {
@@ -409,13 +458,21 @@ async function countPendingPaymentsForVendor(vendorId) {
   return payments.filter((payment) => payment.payment_status === 'pending').length;
 }
 
-// Applies a verified Stripe event to our own payment record — this is the
-// only place payment_status ever moves out of 'pending', since it's the
-// one source Stripe itself confirms (the client-side "succeeded" result
-// alone isn't trustworthy enough to write to the database). Values here
-// must match the DB's own check constraint: pending | paid | failed | refunded.
-// Keyed purely off transaction_id (the Stripe PI id), which stays globally
-// unique per intent regardless of payment_type — no stage-awareness needed.
+// Paid deposit/balance payments on the vendor's bookings since a given
+// moment — drives the "new payments" badge on Booking Management.
+async function countPaidPaymentsForVendorSince(vendorId, since) {
+  const bookings = await bookingModel.listByVendorId(vendorId);
+  if (!bookings.length) {
+    return 0;
+  }
+
+  const sinceMs = since.getTime();
+  const payments = await paymentModel.findByBookingIds(bookings.map((booking) => booking.id));
+  return payments.filter(
+    (payment) => payment.payment_status === 'paid' && payment.paid_at && new Date(payment.paid_at).getTime() > sinceMs
+  ).length;
+}
+
 async function handleWebhookEvent(event) {
   if (event.type === 'payment_intent.succeeded') {
     const paymentIntent = event.data.object;
@@ -433,11 +490,13 @@ async function handleWebhookEvent(event) {
 
 module.exports = {
   createPaymentIntentForBooking,
+  simulatePaymentForBooking,
   handleWebhookEvent,
   buildPaymentSummary,
   getPaymentSummaryForBooking,
   getVendorRevenue,
   getVendorRevenueSeries,
   countPendingPaymentsForVendor,
+  countPaidPaymentsForVendorSince,
   listPaidPaymentsForBookings,
 };

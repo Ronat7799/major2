@@ -155,7 +155,6 @@ export default function VendorNotificationsPage() {
       setNotifications((current) => current.map((notification) => ({ ...notification, unread: false })));
       window.dispatchEvent(new Event('vendor-notifications-read'));
     } catch {
-      // Non-critical — the vendor can just try the button again.
     } finally {
       setMarkingRead(false);
     }

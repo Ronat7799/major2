@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../../api/client';
 import { getErrorMessage } from '../../utils/apiError.js';
+import RevisionRequestNotice from '../../components/vendor/RevisionRequestNotice.jsx';
 
 function PlusIcon() {
   return (
@@ -124,10 +125,11 @@ function formatMoney(value) {
   return `$${(Number(value) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 }
 
+const PLATFORM_COMMISSION_RATE = 0.1;
+
 function emptyItem() {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    service_id: '',
     service_name: '',
     quantity: 1,
     unit_price: '',
@@ -148,7 +150,6 @@ export default function CreateQuotationPage() {
   const [loadError, setLoadError] = useState('');
 
   const [items, setItems] = useState([emptyItem()]);
-  const [myServices, setMyServices] = useState([]);
   const [transportationFee, setTransportationFee] = useState('');
   const [equipmentFee, setEquipmentFee] = useState('');
   const [otherCharges, setOtherCharges] = useState('');
@@ -171,16 +172,12 @@ export default function CreateQuotationPage() {
           setRequest(loadedRequest);
           setLoadError('');
 
-          // Revising starts from the quotation being revised, not a blank
-          // form — otherwise the vendor has to retype every line item and
-          // charge just to make the one change the customer asked for.
           const latest = loadedRequest.latestQuotation;
           if (latest?.status === 'revision_requested') {
             if (latest.items?.length) {
               setItems(
                 latest.items.map((item) => ({
                   id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                  service_id: item.service_id || '',
                   service_name: item.service_name || '',
                   quantity: item.quantity ?? 1,
                   unit_price: item.unit_price ?? '',
@@ -212,46 +209,8 @@ export default function CreateQuotationPage() {
     };
   }, [id]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    api
-      .get('/services/mine/options')
-      .then((response) => {
-        if (!cancelled) {
-          setMyServices(response.data.data.services);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setMyServices([]);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   function updateItem(itemId, field, value) {
     setItems((current) => current.map((item) => (item.id === itemId ? { ...item, [field]: value } : item)));
-  }
-
-  // Picking a real service links the item (service_id) and locks its name
-  // to the catalog; picking "Other" clears the link and falls back to free
-  // text, so a vendor can still quote one-off/custom line items.
-  function selectItemService(itemId, serviceId) {
-    if (!serviceId) {
-      setItems((current) => current.map((item) => (item.id === itemId ? { ...item, service_id: '', service_name: '' } : item)));
-      return;
-    }
-
-    const service = myServices.find((candidate) => candidate.id === serviceId);
-    setItems((current) =>
-      current.map((item) =>
-        item.id === itemId ? { ...item, service_id: serviceId, service_name: service ? service.service_name : item.service_name } : item
-      )
-    );
   }
 
   function addItem() {
@@ -272,6 +231,8 @@ export default function CreateQuotationPage() {
   const additionalTotal =
     (Number(transportationFee) || 0) + (Number(equipmentFee) || 0) + (Number(otherCharges) || 0);
   const grandTotal = subtotal + additionalTotal;
+  const platformFee = grandTotal * PLATFORM_COMMISSION_RATE;
+  const vendorReceives = grandTotal - platformFee;
 
   async function handleSend() {
     setSubmitError('');
@@ -288,7 +249,6 @@ export default function CreateQuotationPage() {
     try {
       const payload = {
         items: validItems.map((item) => ({
-          service_id: item.service_id || undefined,
           service_name: item.service_name.trim(),
           quantity: Number(item.quantity),
           unit_price: Number(item.unit_price),
@@ -307,6 +267,7 @@ export default function CreateQuotationPage() {
       } else {
         await api.post(`/quotation-requests/${id}/quotation`, payload);
       }
+      window.dispatchEvent(new Event('vendor-quotation-requests-changed'));
       navigate(`/vendor/quotation-requests/${id}`, { state: { quotationSent: true } });
     } catch (err) {
       setSubmitError(getErrorMessage(err, 'Unable to send this quotation.'));
@@ -359,7 +320,6 @@ export default function CreateQuotationPage() {
 
   return (
     <div className="pb-4">
-      {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-2 text-sm text-black/40">
         <Link to="/vendor/quotation-requests" className="transition-colors hover:text-black">
           Requests
@@ -375,14 +335,11 @@ export default function CreateQuotationPage() {
       <h1 className="mt-2 text-[28px] font-extrabold tracking-tight text-black">
         {isRevising ? 'Revise Quotation' : 'Create Quotation'}
       </h1>
-      {isRevising && request.latestQuotation.revisionNote ? (
-        <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
-          Customer's requested changes: “{request.latestQuotation.revisionNote}”
-        </p>
+      {isRevising ? (
+        <RevisionRequestNotice className="mt-4" note={request.latestQuotation.revisionNote} />
       ) : null}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-10">
-        {/* Left column: Customer Request Summary */}
         <div className="lg:col-span-3">
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
@@ -484,10 +441,8 @@ export default function CreateQuotationPage() {
           </div>
         </div>
 
-        {/* Right column: Quotation Form */}
         <div className="lg:col-span-7">
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            {/* Service Breakdown */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <h2 className="text-lg font-bold text-black">Service Breakdown</h2>
               <button
@@ -505,28 +460,14 @@ export default function CreateQuotationPage() {
                 <div key={item.id} className="rounded-xl border border-gray-100 p-4">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_0.7fr_1fr_1fr_auto] sm:items-end">
                     <label className="block">
-                      <FieldLabel>Service</FieldLabel>
-                      <select
-                        value={item.service_id}
-                        onChange={(event) => selectItemService(item.id, event.target.value)}
+                      <FieldLabel>Service Name</FieldLabel>
+                      <input
+                        type="text"
+                        value={item.service_name}
+                        onChange={(event) => updateItem(item.id, 'service_name', event.target.value)}
+                        placeholder="e.g. Venue Decoration"
                         className="ui-yellow-border w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-black outline-none transition-shadow"
-                      >
-                        <option value="">Custom / one-off item</option>
-                        {myServices.map((service) => (
-                          <option key={service.id} value={service.id}>
-                            {service.service_name}
-                          </option>
-                        ))}
-                      </select>
-                      {!item.service_id ? (
-                        <input
-                          type="text"
-                          value={item.service_name}
-                          onChange={(event) => updateItem(item.id, 'service_name', event.target.value)}
-                          placeholder="e.g. Venue Decoration"
-                          className="ui-yellow-border mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-black outline-none transition-shadow"
-                        />
-                      ) : null}
+                      />
                     </label>
                     <label className="block">
                       <FieldLabel>Qty</FieldLabel>
@@ -589,7 +530,6 @@ export default function CreateQuotationPage() {
               Services Subtotal: <span className="font-bold text-green-600">{formatMoney(subtotal)}</span>
             </p>
 
-            {/* Additional Charges */}
             <div className="mt-6 border-t border-gray-100 pt-5">
               <h2 className="text-lg font-bold text-black">Additional Charges</h2>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -644,7 +584,6 @@ export default function CreateQuotationPage() {
               </div>
             </div>
 
-            {/* Price Summary */}
             <div className="mt-6 flex flex-col gap-4 rounded-xl bg-[#F5C400]/10 p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-black/40">Services Subtotal</p>
@@ -660,7 +599,13 @@ export default function CreateQuotationPage() {
               </div>
             </div>
 
-            {/* Vendor Message */}
+            <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-dashed border-gray-200 px-4 py-2.5 text-xs text-black/45">
+              <span>Platform Fee ({Math.round(PLATFORM_COMMISSION_RATE * 100)}%, visible to you only)</span>
+              <span className="font-semibold text-black/60">
+                -{formatMoney(platformFee)} &middot; You'll receive {formatMoney(vendorReceives)}
+              </span>
+            </div>
+
             <div className="mt-6 border-t border-gray-100 pt-5">
               <h2 className="text-lg font-bold text-black">Vendor Message</h2>
               <textarea
@@ -678,7 +623,6 @@ export default function CreateQuotationPage() {
               </p>
             ) : null}
 
-            {/* Action Buttons */}
             <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-5">
               <button
                 type="button"

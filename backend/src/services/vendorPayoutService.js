@@ -2,9 +2,6 @@ const stripe = require('../config/stripe');
 const env = require('../config/env');
 const vendorModel = require('../models/vendorModel');
 
-// Resolves (auto-creating if needed) the vendor row for a user — mirrors
-// vendorService.updateMyProfile's existing guard so onboarding works even
-// for a vendor who has never saved a profile yet.
 async function resolveVendor(userId) {
   let vendor = await vendorModel.findByUserId(userId);
   if (!vendor) {
@@ -35,10 +32,6 @@ async function startOnboarding(userId) {
   return { url: accountLink.url };
 }
 
-// Always trusts Stripe's live status over our own cache — same pattern
-// createPaymentIntentForBooking already uses for Payment Intent status —
-// and self-heals the cached booleans on every check so the UI is never
-// stuck on a stale "not enabled" after a webhook lag or missed event.
 async function getPayoutStatus(userId) {
   const vendor = await resolveVendor(userId);
   const account = await vendorModel.findStripeAccountByVendorId(vendor.id);
@@ -61,9 +54,6 @@ async function getPayoutStatus(userId) {
   return { connected: true, chargesEnabled, payoutsEnabled };
 }
 
-// Applies a verified Stripe `account.updated` event to our cached booleans.
-// Safe no-op for any vendor we don't recognize (shouldn't happen, but the
-// account id is attacker-uncontrolled input from a signature-verified event).
 async function handleAccountWebhookEvent(event) {
   if (event.type !== 'account.updated') {
     return;
